@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS: CookbookSettings = {
   databaseFolder: "Cookbook",
   defaultRecipeFile: "recipes-main.json",
   showPackageSuggestions: true,
+  showIngredientAllergens: true,
   preventSidePaneSwipes: true,
   categoryButtons: [],
   guestButtons: [],

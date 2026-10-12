@@ -65,6 +65,15 @@ export class CookbookSettingTab extends PluginSettingTab {
         },
       },
       {
+        name: "Show allergen notices",
+        desc:
+          "Show declared allergens such as gluten, lactose, or egg below ingredients in cooking mode.",
+        control: {
+          type: "toggle" as const,
+          key: "showIngredientAllergens",
+        },
+      },
+      {
         name: "Keep cooking swipes inside Cookbook",
         desc: "Prevents horizontal swipes in cooking mode from opening Obsidian side panes on touch devices.",
         control: {

@@ -5,6 +5,7 @@ export interface CookbookSettings {
   databaseFolder: string;
   defaultRecipeFile: string;
   showPackageSuggestions: boolean;
+  showIngredientAllergens: boolean;
   preventSidePaneSwipes: boolean;
   categoryButtons: CategoryButtonSettings[];
   guestButtons: GuestButtonSettings[];

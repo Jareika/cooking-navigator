@@ -363,23 +363,53 @@ export class CookbookView extends ItemView {
       this.render();
     });
 
-    if (!isGuestSelection) {
-      const manageGuestsButton = actions.createEl("button", {
-        cls: "cookbook-browser-action",
-        attr: {
-          "aria-label": "Manage guests",
-          title: "Manage guests",
-        },
-      });
+    const manageGuestsButton = actions.createEl("button", {
+      cls: "cookbook-browser-action",
+      attr: {
+        "aria-label": "Manage guests",
+        title: "Manage guests",
+      },
+    });
 
-      setIcon(manageGuestsButton, "settings-2");
+    setIcon(manageGuestsButton, "settings-2");
 
-      manageGuestsButton.addEventListener("click", () => {
-        this.plugin.openGuestSettings(() => {
-          void this.reload();
-        });
+    manageGuestsButton.addEventListener("click", () => {
+      this.plugin.openGuestSettings(() => {
+        void this.reload();
       });
-    }
+    });
+
+    const showAllergens = this.plugin.settings.showIngredientAllergens;
+    const allergenButton = actions.createEl("button", {
+      cls: [
+        "cookbook-browser-action",
+        "cookbook-allergen-toggle",
+        showAllergens ? "" : "is-disabled",
+      ],
+      attr: {
+        "aria-label": showAllergens
+          ? "Hide allergen notices"
+          : "Show allergen notices",
+        "aria-pressed": String(showAllergens),
+        title: showAllergens
+          ? "Hide allergen notices"
+          : "Show allergen notices",
+      },
+    });
+
+    setIcon(allergenButton, "shield-alert");
+
+    allergenButton.addEventListener("click", () => {
+      void this.toggleIngredientAllergens();
+    });
+  }
+
+  private async toggleIngredientAllergens(): Promise<void> {
+    this.plugin.settings.showIngredientAllergens =
+      !this.plugin.settings.showIngredientAllergens;
+
+    await this.plugin.saveSettings();
+    this.render();
   }
 
   private renderRecipeCard(
@@ -431,8 +461,13 @@ export class CookbookView extends ItemView {
     const pages = buildCookingPages(plan);
     const safePage = Math.max(0, Math.min(page, pages.length - 1));
 
-    const root = this.containerEl.createDiv("cookbook-cooking");
-    const pageEl = root.createDiv("cookbook-cooking-page");
+    const root = this.containerEl.createDiv({
+      cls: ["cookbook-root", "cookbook-cooking-screen"],
+    });
+    const cooking = root.createDiv("cookbook-cooking");
+    const pageEl = cooking.createDiv("cookbook-cooking-page");
+
+    this.renderBrowserActions(root);
 
     let pointerId: number | null = null;
     let pointerStartX = 0;
@@ -584,7 +619,11 @@ export class CookbookView extends ItemView {
         });
       }
 
-      renderIngredientGrid(pageEl, plan.ingredients);
+      renderIngredientGrid(
+        pageEl,
+        plan.ingredients,
+        this.plugin.settings.showIngredientAllergens,
+      );
     }
 
     if (currentPage.kind === "step") {
@@ -592,7 +631,11 @@ export class CookbookView extends ItemView {
         text: currentPage.step.title ?? `Step ${currentPage.stepIndex + 1}`,
       });
 
-      renderIngredientGrid(pageEl, currentPage.step.ingredients);
+      renderIngredientGrid(
+        pageEl,
+        currentPage.step.ingredients,
+        this.plugin.settings.showIngredientAllergens,
+      );
 
       const instructionList = pageEl.createEl("ol", "cookbook-instructions");
 
@@ -608,7 +651,7 @@ export class CookbookView extends ItemView {
       }
     }
 
-    const footer = root.createDiv("cookbook-cooking-footer");
+    const footer = cooking.createDiv("cookbook-cooking-footer");
 
     const previous = footer.createEl("button", {
       text: safePage === 0 ? "Back to browser" : "Previous",
@@ -857,6 +900,7 @@ function buildCookingPages(plan: RecipePlan) {
 function renderIngredientGrid(
   parent: HTMLElement,
   ingredients: ScaledIngredient[],
+  showAllergens: boolean,
 ): void {
   const grid = parent.createDiv("cookbook-ingredient-grid");
 
@@ -878,7 +922,7 @@ function renderIngredientGrid(
 
     card.createDiv({ text: amount });
 	
-    if (item.allergens.length > 0) {
+    if (showAllergens && item.allergens.length > 0) {
       card.createEl("small", {
         cls: "cookbook-ingredient-allergens",
         text: `Contains: ${item.allergens

@@ -40,3 +40,4 @@
 - Recipes containing an allergen not tolerated by any selected guest are now filtered out automatically.
 - Cooking-mode ingredient cards now display declared allergens.
 - Guest management now provides allergen and intolerance checkboxes.
+- Added a setting to optionally hide allergen notices below ingredients in cooking mode.
