@@ -1,0 +1,42 @@
+## [Unreleased]
+
+- JSON-based cookbook database stored inside the vault.
+- Support for one or multiple `recipes-*.json` files in a single cookbook folder.
+- Ingredient catalog with units, package sizes, resource priority, and package rounding thresholds.
+- Guest profiles with avatars, colors, eater weights, scoped ingredient avoidances, and favorite recipes.
+- Recipe categories and category filtering.
+- Recipe filtering based on every selected guest's ingredient restrictions.
+- Adaptive ingredient scaling based on summed eater weights.
+- Primary and secondary critical-resource scaling.
+- Touch-friendly recipe browser and step-by-step cooking mode.
+- Swipe navigation between ingredient, image, and instruction pages.
+- Optional recipe images before ingredients or after ingredients.
+- Declarative Obsidian 1.13+ settings tab.
+- Configurable square category buttons in the recipe browser.
+- Category buttons can be reordered with drag and drop in plugin settings.
+- Category buttons can use user-selected image files from the vault.
+- Vertical category-image buttons without permanent text overlays.
+- Optional native Obsidian category-name tooltips, configurable through Style Settings.
+- Style Settings controls for category button size and corner radius.
+- Optional invisible category-button chrome for transparent images with their own visual frame.
+- Category buttons now enforce a square width and height.
+- Show a readable error instead of a blank cooking view when cookbook JSON references an unknown ingredient.
+- Optional vault image for the “All recipes” category button.
+- Recipe cards are displayed in a single vertical list.
+- Style Settings controls for recipe-card width and minimum height.
+- Recipe titles and recipe metadata are displayed on separate lines.
+- Added a vertical browser action bar with reload and guest-selection buttons.
+- Added a dedicated guest-selection view for managing active guests.
+- Recipe ingredients can now define `Suffix` for recipe-specific wording appended to a canonical library ingredient name.
+- Cooking-mode page navigation now supports horizontal drag gestures with a mouse, touch input, or pen.
+- Added a guest-management modal accessible from the recipe browser.
+- Guests can now be created directly in the plugin and are persisted in `cookbook-library.json`.
+- Added configurable vault images and ordering for square guest-selection buttons.
+- Guest selection now uses horizontal square image buttons without permanent labels.
+- Added optional guest-name tooltips and Style Settings controls for guest-button size, radius and chrome.
+- Added configurable allergen and intolerance markers such as gluten, lactose, egg, nuts, or soy.
+- Ingredients can now declare contained allergens through `allergenIds`.
+- Guest profiles can define intolerances and allergies through `intoleranceAllergenIds`.
+- Recipes containing an allergen not tolerated by any selected guest are now filtered out automatically.
+- Cooking-mode ingredient cards now display declared allergens.
+- Guest management now provides allergen and intolerance checkboxes.

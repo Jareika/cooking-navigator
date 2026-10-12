@@ -1,0 +1,584 @@
+/* @settings
+
+name: Cooking Navigator
+id: cooking-navigator
+settings:
+  -
+    id: cookbook-category-button-size
+    title: Größe der Kategorie-Buttons
+    title.de: Größe der Kategorie-Buttons
+    description: Seitenlänge der quadratischen Kategorie-Bilder.
+    description.de: Seitenlänge der quadratischen Kategorie-Bilder.
+    type: variable-number-slider
+    default: 104
+    min: 56
+    max: 240
+    step: 4
+    format: px
+  -
+    id: cookbook-category-button-radius
+    title: Eckenradius der Kategorie-Buttons
+    title.de: Eckenradius der Kategorie-Buttons
+    description: Rundung der Kategorie-Bilder.
+    description.de: Rundung der Kategorie-Bilder.
+    type: variable-number-slider
+    default: 12
+    min: 0
+    max: 48
+    step: 1
+    format: px
+  -
+    id: cookbook-guest-button-size
+    title: Größe der Gäste-Buttons
+    title.de: Größe der Gäste-Buttons
+    description: Seitenlänge der quadratischen Gäste-Bilder.
+    description.de: Seitenlänge der quadratischen Gäste-Bilder.
+    type: variable-number-slider
+    default: 84
+    min: 48
+    max: 200
+    step: 4
+    format: px
+  -
+    id: cookbook-guest-button-radius
+    title: Eckenradius der Gäste-Buttons
+    title.de: Eckenradius der Gäste-Buttons
+    description: Rundung der quadratischen Gäste-Bilder.
+    description.de: Rundung der quadratischen Gäste-Bilder.
+    type: variable-number-slider
+    default: 12
+    min: 0
+    max: 48
+    step: 1
+    format: px
+  -
+    id: cookbook-show-guest-button-chrome
+    title: Gäste-Button-Fläche anzeigen
+    title.de: Gäste-Button-Fläche anzeigen
+    description: Zeigt Hintergrund, Rahmen und Auswahlmarkierung der Gäste-Buttons.
+    description.de: Zeigt Hintergrund, Rahmen und Auswahlmarkierung der Gäste-Buttons.
+    default: true
+  -
+    id: cookbook-show-guest-tooltips
+    title: Gäste-Tooltips anzeigen
+    title.de: Gäste-Tooltips anzeigen
+    description: Zeigt beim Darüberfahren oder Fokussieren den Namen des Gasts.
+    description.de: Zeigt beim Darüberfahren oder Fokussieren den Namen des Gasts.
+    type: class-toggle
+    default: false
+  -
+    id: cookbook-recipe-card-width
+    title: Breite der Rezeptkacheln
+    title.de: Breite der Rezeptkacheln
+    description: Maximale Breite einer Rezeptkachel in der einspaltigen Rezeptliste.
+    description.de: Maximale Breite einer Rezeptkachel in der einspaltigen Rezeptliste.
+    type: variable-number-slider
+    default: 420
+    min: 220
+    max: 800
+    step: 10
+    format: px
+  -
+    id: cookbook-recipe-card-min-height
+    title: Mindesthöhe der Rezeptkacheln
+    title.de: Mindesthöhe der Rezeptkacheln
+    description: Mindesthöhe einer Rezeptkachel. Größere Inhalte dürfen die Kachel weiterhin erweitern.
+    description.de: Mindesthöhe einer Rezeptkachel. Größere Inhalte dürfen die Kachel weiterhin erweitern.
+    type: variable-number-slider
+    default: 110
+    min: 42
+    max: 320
+    step: 4
+    format: px
+  -
+    id: cookbook-show-category-button-chrome
+    title: Kategorie-Button-Fläche anzeigen
+    title.de: Kategorie-Button-Fläche anzeigen
+    description: Zeigt Hintergrund, Rahmen und Markierung des Buttons. Deaktivieren, wenn transparente Bilder ihren eigenen Rahmen mitbringen.
+    description.de: Zeigt Hintergrund, Rahmen und Markierung des Buttons. Deaktivieren, wenn transparente Bilder ihren eigenen Rahmen mitbringen.
+    default: true
+  -
+    id: cookbook-show-category-tooltips
+    title: Kategorie-Tooltips anzeigen
+    title.de: Kategorie-Tooltips anzeigen
+    description: Zeigt den nativen Obsidian-Tooltip beim Darüberfahren oder Fokussieren an.
+    description.de: Zeigt den nativen Obsidian-Tooltip beim Darüberfahren oder Fokussieren an.
+    type: class-toggle
+    default: false
+
+*/
+
+.cookbook-root,
+.cookbook-cooking {
+  height: 100%;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.cookbook-browser-screen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1rem;
+}
+
+.cookbook-browser-content {
+  min-width: 0;
+}
+
+.cookbook-browser-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cookbook-browser-action {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 0.6rem;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+
+.cookbook-browser-action:hover {
+  background: var(--background-secondary-alt);
+}
+
+.cookbook-browser-action.is-active {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--interactive-accent) 25%, transparent);
+}
+
+.cookbook-browser-layout {
+  display: grid;
+  grid-template-columns:
+    var(--cookbook-category-button-size, 104px)
+    minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+}
+
+.cookbook-recipe-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(0, min(100%, var(--cookbook-recipe-card-width, 420px)));
+  align-content: start;
+  justify-content: start;
+  gap: 0.75rem;
+}
+
+.cookbook-recipe-card {
+  min-height: var(--cookbook-recipe-card-min-height, 110px);
+  padding: 1rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 0.75rem;
+  background: var(--background-secondary);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.cookbook-recipe-card:hover {
+  background: var(--background-secondary-alt);
+}
+
+.cookbook-recipe-card.is-favorite {
+  border-left: 0.45rem solid var(--favorite-color);
+}
+
+.cookbook-recipe-meta {
+  display: block;
+  margin-top: 0;
+  color: var(--text-muted);
+  font-size: 0.85em;
+  line-height: 1.4;
+}
+
+.cookbook-recipe-card strong {
+  display: block;
+}
+
+.cookbook-guest-selection-description {
+  margin: 0 0 1rem;
+  color: var(--text-muted);
+}
+
+.cookbook-guest-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.cookbook-guest-card {
+  display: grid;
+  width: var(--cookbook-guest-button-size, 84px);
+  height: var(--cookbook-guest-button-size, 84px);
+  flex: 0 0 var(--cookbook-guest-button-size, 84px);
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: var(--cookbook-guest-button-radius, 12px);
+  padding: 0;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.cookbook-guest-card:hover {
+  background: var(--background-secondary-alt);
+}
+
+.cookbook-guest-card.is-selected {
+  border-color: var(--person-color);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--person-color) 30%, transparent);
+}
+
+.cookbook-guest-card:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 3px;
+}
+
+.cookbook-guest-button-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cookbook-guest-button-initials,
+.cookbook-guest-settings-preview {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--person-color) 75%, transparent);
+  color: white;
+  font-weight: 700;
+}
+
+.cookbook-guest-button-initials {
+  width: 100%;
+  height: 100%;
+}
+
+body:not(.cookbook-show-guest-button-chrome)
+  .cookbook-guest-card {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+body:not(.cookbook-show-guest-button-chrome)
+  .cookbook-guest-card.is-selected,
+body:not(.cookbook-show-guest-button-chrome)
+  .cookbook-guest-card:hover {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.cookbook-guest-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.cookbook-guest-settings-row {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) minmax(10rem, 16rem) auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 0.75rem;
+  background: var(--background-secondary);
+}
+
+.cookbook-guest-settings-preview {
+  width: 3rem;
+  height: 3rem;
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+
+.cookbook-guest-settings-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cookbook-guest-settings-details {
+  min-width: 0;
+}
+
+.cookbook-guest-settings-image-select {
+  min-width: 0;
+}
+
+.cookbook-add-guest {
+  padding-top: 1rem;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.cookbook-add-guest-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem 3rem auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+@media (max-width: 600px) {
+  .cookbook-guest-settings-row {
+    grid-template-columns: 3rem minmax(0, 1fr) auto auto;
+  }
+
+  .cookbook-guest-settings-image-select {
+    grid-column: 1 / -1;
+  }
+
+  .cookbook-add-guest-fields {
+    grid-template-columns: minmax(0, 1fr) 6rem 3rem;
+  }
+
+  .cookbook-add-guest-fields button {
+    grid-column: 1 / -1;
+  }
+}
+
+.cookbook-category-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-content: start;
+  gap: 0.5rem;
+}
+
+.cookbook-category-button {
+  position: relative;
+  width: var(--cookbook-category-button-size, 104px);
+  height: var(--cookbook-category-button-size, 104px);
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  flex: 0 0 var(--cookbook-category-button-size, 104px);
+  box-sizing: border-box;
+  overflow: visible;
+  border: 2px solid var(--category-color, transparent);
+  border-radius: var(--cookbook-category-button-radius, 12px);
+  padding: 0;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+
+.workspace-leaf-content[data-type="cookbook-browser-view"]
+  .cookbook-category-list
+  .cookbook-category-button {
+  width: var(--cookbook-category-button-size, 104px);
+  height: var(--cookbook-category-button-size, 104px);
+  max-width: 100%;
+  flex: 0 0 var(--cookbook-category-button-size, 104px);
+  align-self: flex-start;
+}
+
+.cookbook-category-button[role="button"] {
+  cursor: pointer;
+}
+
+.cookbook-category-button[role="button"]:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 3px;
+}
+
+.cookbook-category-button:hover {
+  background: var(--background-secondary-alt);
+}
+
+.cookbook-category-button.is-active {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--interactive-accent) 35%, transparent);
+}
+
+.cookbook-category-button-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.cookbook-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+body:not(.cookbook-show-category-button-chrome)
+  .cookbook-category-button {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+body:not(.cookbook-show-category-button-chrome)
+  .cookbook-category-button:hover,
+body:not(.cookbook-show-category-button-chrome)
+  .cookbook-category-button.is-active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+body:not(.cookbook-show-category-button-chrome)
+  .cookbook-category-button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 3px;
+}
+
+.cookbook-cooking {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 1rem;
+  touch-action: pan-y;
+}
+
+.cookbook-cooking-page {
+  min-height: 0;
+  overflow: auto;
+  border-radius: 0.75rem;
+  background: var(--background-primary);
+  cursor: grab;
+}
+
+.cookbook-cooking-page.is-swiping-horizontally {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.cookbook-cooking-page h1 {
+  margin-top: 0;
+}
+
+.cookbook-subtitle {
+  color: var(--text-muted);
+}
+
+.cookbook-full-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 20rem;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: 0.75rem;
+  background: var(--background-secondary);
+}
+
+.cookbook-ingredient-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.cookbook-ingredient {
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--background-secondary);
+}
+
+.cookbook-ingredient small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+}
+
+.cookbook-ingredient-allergens {
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+.cookbook-guest-allergen-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin-top: 0.45rem;
+}
+
+.cookbook-guest-allergen-controls > small {
+  width: 100%;
+  color: var(--text-muted);
+}
+
+.cookbook-guest-allergen-option {
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.cookbook-instructions {
+  padding-left: 1.5rem;
+  font-size: 1.1em;
+  line-height: 1.65;
+}
+
+.cookbook-package-hint,
+.cookbook-timer-hint {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--background-secondary-alt);
+  color: var(--text-muted);
+}
+
+.cookbook-cooking-footer {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.cookbook-cooking-footer button:last-child {
+  justify-self: end;
+}
+
+.cookbook-empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+@media (max-width: 700px) {
+  .cookbook-browser-screen {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem;
+  }
+
+  .cookbook-browser-action {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .cookbook-browser-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .cookbook-category-list {
+    order: -1;
+	align-items: flex-start;
+  }
+}
