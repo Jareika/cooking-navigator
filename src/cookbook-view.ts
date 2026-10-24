@@ -1,6 +1,7 @@
 import {
   ItemView,
   normalizePath,
+  Platform,
   setIcon,
   TFile,
   WorkspaceLeaf,
@@ -83,13 +84,21 @@ export class CookbookView extends ItemView {
           : "Unknown database error.",
     });
 
-    const button = wrapper.createEl("button", {
+    const createExampleButton = wrapper.createEl("button", {
       text: "Create example database",
       cls: "mod-cta",
     });
 
-    button.addEventListener("click", () => {
+    createExampleButton.addEventListener("click", () => {
       void this.createExampleDatabaseAndReload();
+    });
+
+    const restoreBackupButton = wrapper.createEl("button", {
+      text: "Restore library from backup",
+    });
+
+    restoreBackupButton.addEventListener("click", () => {
+      void this.restoreLibraryBackupAndReload();
     });
   }
   
@@ -97,6 +106,18 @@ export class CookbookView extends ItemView {
     try {
       await this.plugin.createExampleDatabase();
       await this.reload();
+    } catch (error) {
+      this.renderError(error);
+    }
+  }
+  
+  private async restoreLibraryBackupAndReload(): Promise<void> {
+    try {
+      const restored = await this.plugin.restoreLibraryFromBackup();
+
+      if (restored) {
+        await this.reload();
+      }
     } catch (error) {
       this.renderError(error);
     }
@@ -325,6 +346,25 @@ export class CookbookView extends ItemView {
 
   private renderBrowserActions(parent: HTMLElement): void {
     const actions = parent.createDiv("cookbook-browser-actions");
+	
+    if (Platform.isDesktopApp) {
+      const closeButton = actions.createEl("button", {
+        cls: [
+          "cookbook-browser-action",
+          "cookbook-close-app-action",
+        ],
+        attr: {
+          "aria-label": "Obsidian schließen",
+          title: "Obsidian schließen",
+        },
+      });
+
+      setIcon(closeButton, "power");
+
+      closeButton.addEventListener("click", () => {
+        window.close();
+      });
+    }
 
     const reloadButton = actions.createEl("button", {
       cls: "cookbook-browser-action",
@@ -372,11 +412,49 @@ export class CookbookView extends ItemView {
     });
 
     setIcon(manageGuestsButton, "settings-2");
+	
+    const isFocusMode = this.plugin.isCookbookFocusModeEnabled();
+    const focusModeButton = actions.createEl("button", {
+      cls: [
+        "cookbook-browser-action",
+        "cookbook-focus-mode-toggle",
+        isFocusMode ? "is-active" : "",
+      ],
+      attr: {
+        "aria-label": isFocusMode
+          ? "Cookbook-Fokusmodus beenden"
+          : "Cookbook in den Vordergrund bringen",
+        "aria-pressed": String(isFocusMode),
+        title: isFocusMode
+          ? "Cookbook-Fokusmodus beenden"
+          : "Cookbook in den Vordergrund bringen",
+      },
+    });
+
+    setIcon(focusModeButton, isFocusMode ? "minimize-2" : "maximize-2");
+
+    focusModeButton.addEventListener("click", () => {
+      void this.toggleFocusMode();
+    });
 
     manageGuestsButton.addEventListener("click", () => {
       this.plugin.openGuestSettings(() => {
         void this.reload();
       });
+    });
+	
+    const settingsButton = actions.createEl("button", {
+      cls: "cookbook-browser-action",
+      attr: {
+        "aria-label": "Cooking-Navigator-Einstellungen öffnen",
+        title: "Cooking-Navigator-Einstellungen",
+      },
+    });
+
+    setIcon(settingsButton, "settings");
+
+    settingsButton.addEventListener("click", () => {
+      this.plugin.openCookbookSettings();
     });
 
     const showAllergens = this.plugin.settings.showIngredientAllergens;
@@ -409,6 +487,11 @@ export class CookbookView extends ItemView {
       !this.plugin.settings.showIngredientAllergens;
 
     await this.plugin.saveSettings();
+    this.render();
+  }
+  
+  private async toggleFocusMode(): Promise<void> {
+    await this.plugin.toggleCookbookFocusMode();
     this.render();
   }
 
@@ -576,7 +659,9 @@ export class CookbookView extends ItemView {
     const currentPage = pages[safePage];
 
     if (currentPage.kind === "image") {
-      const imageUrl = this.resolveImageUrl(currentPage.imageUrl);
+      pageEl.addClass("is-image-page");
+	  
+	  const imageUrl = this.resolveImageUrl(currentPage.imageUrl);
 
       const image = pageEl.createEl("img", {
         cls: "cookbook-full-image",
@@ -848,7 +933,8 @@ export class CookbookView extends ItemView {
       const styleSettingChanged = mutations.some(
         (mutation) =>
           mutation.type === "attributes" &&
-          mutation.attributeName === "class",
+          mutation.attributeName === "class" &&
+          this.didTooltipSettingChange(mutation),
       );
 
       if (
@@ -861,8 +947,26 @@ export class CookbookView extends ItemView {
 
     this.styleSettingsObserver.observe(document.body, {
       attributes: true,
+	  attributeOldValue: true,
       attributeFilter: ["class"],
     });
+  }
+  
+  private didTooltipSettingChange(mutation: MutationRecord): boolean {
+    const previousClasses = new Set(
+      (mutation.oldValue ?? "")
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+
+    return [
+      "cookbook-show-category-tooltips",
+      "cookbook-show-guest-tooltips",
+    ].some(
+      (className) =>
+        previousClasses.has(className) !==
+        document.body.classList.contains(className),
+    );
   }
 }
 
@@ -905,7 +1009,12 @@ function renderIngredientGrid(
   const grid = parent.createDiv("cookbook-ingredient-grid");
 
   for (const item of ingredients) {
-    const card = grid.createDiv("cookbook-ingredient");
+    const card = grid.createDiv({
+      cls: [
+        "cookbook-ingredient",
+        item.usesAlternative ? "is-alternative" : "",
+      ],
+    });
 
     card.createEl("strong", {
       text: [
@@ -921,6 +1030,13 @@ function renderIngredientGrid(
     )}`;
 
     card.createDiv({ text: amount });
+	
+    if (item.usesAlternative) {
+      card.createEl("small", {
+        cls: "cookbook-ingredient-alternative",
+        text: `Alternative für ${item.originalIngredient.name}`,
+      });
+    }
 	
     if (showAllergens && item.allergens.length > 0) {
       card.createEl("small", {

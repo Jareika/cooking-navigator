@@ -4,9 +4,12 @@ export type ImagePlacement = "cover" | "after-ingredients";
 export interface CookbookSettings {
   databaseFolder: string;
   defaultRecipeFile: string;
+  enableJsonBackups: boolean;
+  backupFolder: string;
   showPackageSuggestions: boolean;
   showIngredientAllergens: boolean;
   preventSidePaneSwipes: boolean;
+  cookbookFocusMode: boolean;
   categoryButtons: CategoryButtonSettings[];
   guestButtons: GuestButtonSettings[];
   allRecipesButtonImagePath?: string;
@@ -98,6 +101,7 @@ export interface CookbookLibrary {
 
 export interface RecipeIngredient {
   ingredientId: string;
+  alternativeIngredientId?: string;
   amount: number;
   unit?: string;
   unitPlural?: string;
@@ -146,6 +150,8 @@ export interface RecipeDocument {
 
 export interface ScaledIngredient extends RecipeIngredient {
   ingredient: IngredientDefinition;
+  originalIngredient: IngredientDefinition;
+  usesAlternative: boolean;
   allergens: AllergenDefinition[];
   scaledAmount: number;
   displayAmount: number;

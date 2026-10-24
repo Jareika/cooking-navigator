@@ -1,6 +1,10 @@
 import { App, Modal, setIcon } from "obsidian";
 import type CookbookPlugin from "./main";
-import type { CookbookLibrary, CookbookPerson } from "./types";
+import type {
+  CookbookLibrary,
+  CookbookPerson,
+  Recipe,
+} from "./types";
 
 const IMAGE_EXTENSIONS = new Set([
   "avif",
@@ -25,6 +29,8 @@ const DEFAULT_GUEST_COLORS = [
 
 export class GuestSettingsModal extends Modal {
   private library: CookbookLibrary | null = null;
+  private expandedGuestIds = new Set<string>();
+  private recipes: Recipe[] = [];
 
   constructor(
     app: App,
@@ -56,10 +62,11 @@ export class GuestSettingsModal extends Modal {
     }
 
     this.contentEl.createEl("h2", { text: "Manage guests" });
+	this.recipes = await this.plugin.database.loadRecipes();
     this.contentEl.createEl("p", {
       cls: "setting-item-description",
       text:
-        "Add guests, choose a square vault image and change the order of guest buttons.",
+        "Gäste können aufgeklappt bearbeitet werden. Dort lassen sich Bild, Portionsgröße, Allergene und Zutaten-Avoidances verwalten.",
     });
 
     this.renderGuestList(this.library);
@@ -78,7 +85,10 @@ export class GuestSettingsModal extends Modal {
     )) {
       const row = list.createDiv("cookbook-guest-settings-row");
 
-      const preview = row.createDiv("cookbook-guest-settings-preview");
+      const header = row.createDiv("cookbook-guest-settings-header");
+      const expanded = this.expandedGuestIds.has(person.id);
+
+      const preview = header.createDiv("cookbook-guest-settings-preview");
       preview.style.setProperty("--person-color", person.color);
 
       if (imagePath ?? person.avatarUrl) {
@@ -92,42 +102,13 @@ export class GuestSettingsModal extends Modal {
         preview.createSpan({ text: initials(person.name) });
       }
 
-      const details = row.createDiv("cookbook-guest-settings-details");
-      details.createEl("strong", { text: person.name });
-      details.createDiv({
-        cls: "setting-item-description",
-        text: `${formatNumber(person.eaterWeight)} eater units`,
-      });
-	  
-	  this.renderAllergenControls(details, person, library);
-
-      const imageSelect = row.createEl("select", {
-        cls: "cookbook-guest-settings-image-select",
-        attr: {
-          "aria-label": `Image for ${person.name}`,
-        },
-      });
-
-      imageSelect.createEl("option", {
-        text: "No configured image",
-        value: "",
-      });
-
-      for (const file of imageFiles) {
-        imageSelect.createEl("option", {
-          text: file.path,
-          value: file.path,
-        });
-      }
-
-      imageSelect.value = imagePath ?? "";
-
-      imageSelect.addEventListener("change", () => {
-        void this.updateImage(person, imageSelect.value || undefined);
+      header.createEl("strong", {
+        cls: "cookbook-guest-settings-name",
+        text: person.name,
       });
 
       const moveUp = this.createIconButton(
-        row,
+        header,
         "chevron-up",
         `Move ${person.name} up`,
       );
@@ -138,7 +119,7 @@ export class GuestSettingsModal extends Modal {
       });
 
       const moveDown = this.createIconButton(
-        row,
+        header,
         "chevron-down",
         `Move ${person.name} down`,
       );
@@ -149,7 +130,99 @@ export class GuestSettingsModal extends Modal {
       moveDown.addEventListener("click", () => {
         void this.moveGuest(person.id, 1);
       });
+
+      const toggle = this.createIconButton(
+        header,
+        expanded ? "chevron-up" : "chevron-down",
+        expanded
+          ? `${person.name} einklappen`
+          : `${person.name} bearbeiten`,
+      );
+      toggle.addClass("cookbook-guest-settings-expand-button");
+
+      toggle.addEventListener("click", () => {
+        if (this.expandedGuestIds.has(person.id)) {
+          this.expandedGuestIds.delete(person.id);
+        } else {
+          this.expandedGuestIds.add(person.id);
+        }
+
+        void this.render();
+      });
+
+      if (!expanded) {
+        continue;
+      }
+
+      const content = row.createDiv("cookbook-guest-settings-content");
+
+      this.renderGuestGeneralControls(
+        content,
+        person,
+        imagePath,
+        imageFiles,
+      );
+      this.renderAllergenControls(content, person, library);
+      this.renderAvoidanceControls(content, person, library);
+	  this.renderFavoriteRecipeControls(content, person);
     }
+  }
+  
+  private renderGuestGeneralControls(
+    parent: HTMLElement,
+    person: CookbookPerson,
+    imagePath: string | undefined,
+    imageFiles: ReturnType<App["vault"]["getFiles"]>,
+  ): void {
+    const controls = parent.createDiv("cookbook-guest-general-controls");
+
+    const weightLabel = controls.createEl("label", {
+      cls: "cookbook-guest-field",
+      text: "Portionsgröße",
+    });
+
+    const eaterWeightInput = weightLabel.createEl("input", {
+      attr: {
+        type: "number",
+        min: "0.1",
+        step: "0.1",
+        value: String(person.eaterWeight),
+        "aria-label": `Portionsgröße für ${person.name}`,
+      },
+    });
+
+    eaterWeightInput.addEventListener("change", () => {
+      void this.updateEaterWeight(person, Number(eaterWeightInput.value));
+    });
+
+    const imageLabel = controls.createEl("label", {
+      cls: "cookbook-guest-field cookbook-guest-image-field",
+      text: "Bild",
+    });
+
+    const imageSelect = imageLabel.createEl("select", {
+      attr: {
+        "aria-label": `Bild für ${person.name}`,
+      },
+    });
+
+    imageSelect.createEl("option", {
+      text: "Kein konfiguriertes Bild",
+      value: "",
+    });
+
+    for (const file of imageFiles) {
+      imageSelect.createEl("option", {
+        text: file.path,
+        value: file.path,
+      });
+    }
+
+    imageSelect.value = imagePath ?? "";
+
+    imageSelect.addEventListener("change", () => {
+      void this.updateImage(person, imageSelect.value || undefined);
+    });
   }
   
   private renderAllergenControls(
@@ -164,9 +237,6 @@ export class GuestSettingsModal extends Modal {
     }
 
     const controls = parent.createDiv("cookbook-guest-allergen-controls");
-    controls.createEl("small", {
-      text: "Unverträglichkeiten / Allergien",
-    });
 
     const selectedIds = new Set(person.intoleranceAllergenIds ?? []);
 
@@ -183,7 +253,7 @@ export class GuestSettingsModal extends Modal {
       });
 
       input.checked = selectedIds.has(allergen.id);
-      label.appendText(` ${allergen.name}`);
+      label.createSpan({ text: allergen.name });
 
       input.addEventListener("change", () => {
         void this.updateGuestAllergen(
@@ -193,6 +263,112 @@ export class GuestSettingsModal extends Modal {
         );
       });
     }
+  }
+
+  private renderAvoidanceControls(
+    parent: HTMLElement,
+    person: CookbookPerson,
+    library: CookbookLibrary,
+  ): void {
+    const section = parent.createDiv("cookbook-guest-avoidance-controls");
+    section.createEl("small", { text: "Zutaten vermeiden" });
+
+    const scopeById = new Map(
+      library.restrictionScopes.map((scope) => [scope.id, scope]),
+    );
+    const ingredientById = new Map(
+      library.ingredients.map((ingredient) => [ingredient.id, ingredient]),
+    );
+
+    const existing = section.createDiv("cookbook-guest-avoidance-list");
+
+    for (const avoidance of person.avoidances) {
+      const scope = scopeById.get(avoidance.scopeId);
+
+      for (const ingredientId of avoidance.ingredientIds) {
+        const ingredient = ingredientById.get(ingredientId);
+
+        if (!ingredient) {
+          continue;
+        }
+
+        const item = existing.createDiv("cookbook-guest-avoidance-item");
+        item.createSpan({
+          text: `${scope?.name ?? avoidance.scopeId}: ${ingredient.name}`,
+        });
+
+        const remove = this.createIconButton(
+          item,
+          "x",
+          `${ingredient.name} für ${person.name} wieder erlauben`,
+        );
+        remove.addClass("cookbook-guest-avoidance-remove");
+
+        remove.addEventListener("click", () => {
+          void this.removeAvoidance(
+            person,
+            avoidance.scopeId,
+            ingredientId,
+          );
+        });
+      }
+    }
+
+    const addControls = section.createDiv("cookbook-guest-avoidance-add");
+
+    const scopeSelect = addControls.createEl("select", {
+      attr: {
+        "aria-label": `Geltungsbereich für ${person.name}`,
+      },
+    });
+
+    for (const scope of library.restrictionScopes) {
+      scopeSelect.createEl("option", {
+        text: scope.name,
+        value: scope.id,
+      });
+    }
+
+    const ingredientSelect = addControls.createEl("select", {
+      attr: {
+        "aria-label": `Zutat für ${person.name}`,
+      },
+    });
+
+    for (const ingredient of [...library.ingredients].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
+      ingredientSelect.createEl("option", {
+        text: ingredient.name,
+        value: ingredient.id,
+      });
+    }
+
+    const add = addControls.createEl("button", {
+      text: "Hinzufügen",
+    });
+
+    add.addEventListener("click", () => {
+      void this.addAvoidance(
+        person,
+        scopeSelect.value,
+        ingredientSelect.value,
+      );
+    });
+  }
+
+  private async updateEaterWeight(
+    person: CookbookPerson,
+    eaterWeight: number,
+  ): Promise<void> {
+    if (!Number.isFinite(eaterWeight) || eaterWeight <= 0) {
+      this.plugin.notice("Die Portionsgröße muss größer als null sein.");
+      await this.render();
+      return;
+    }
+
+    person.eaterWeight = eaterWeight;
+    await this.saveLibraryAndNotify();
   }
 
   private async updateGuestAllergen(
@@ -210,6 +386,162 @@ export class GuestSettingsModal extends Modal {
 
     person.intoleranceAllergenIds = [...allergenIds];
 
+    await this.saveLibraryAndNotify();
+  }
+ 
+  private async addAvoidance(
+    person: CookbookPerson,
+    scopeId: string,
+    ingredientId: string,
+  ): Promise<void> {
+    let avoidance = person.avoidances.find(
+      (entry) => entry.scopeId === scopeId,
+    );
+
+    if (!avoidance) {
+      avoidance = { scopeId, ingredientIds: [] };
+      person.avoidances.push(avoidance);
+    }
+
+    if (avoidance.ingredientIds.includes(ingredientId)) {
+      this.plugin.notice("Diese Zutat ist bereits als Avoidance eingetragen.");
+      return;
+    }
+
+    avoidance.ingredientIds.push(ingredientId);
+    await this.saveLibraryAndNotify();
+    await this.render();
+  }
+
+  private async removeAvoidance(
+    person: CookbookPerson,
+    scopeId: string,
+    ingredientId: string,
+  ): Promise<void> {
+    const avoidance = person.avoidances.find(
+      (entry) => entry.scopeId === scopeId,
+    );
+
+    if (!avoidance) {
+      return;
+    }
+
+    avoidance.ingredientIds = avoidance.ingredientIds.filter(
+      (id) => id !== ingredientId,
+    );
+
+    person.avoidances = person.avoidances.filter(
+      (entry) => entry.ingredientIds.length > 0,
+    );
+
+    await this.saveLibraryAndNotify();
+    await this.render();
+  }
+  
+  private renderFavoriteRecipeControls(
+    parent: HTMLElement,
+    person: CookbookPerson,
+  ): void {
+    const section = parent.createDiv("cookbook-guest-favorite-controls");
+    section.createEl("small", { text: "Lieblingsrezepte" });
+
+    const recipeById = new Map(
+      this.recipes.map((recipe) => [recipe.id, recipe]),
+    );
+    const existing = section.createDiv("cookbook-guest-favorite-list");
+
+    for (const recipeId of person.favoriteRecipeIds) {
+      const recipe = recipeById.get(recipeId);
+
+      if (!recipe) {
+        continue;
+      }
+
+      const item = existing.createDiv("cookbook-guest-favorite-item");
+      item.createSpan({ text: recipe.title });
+
+      const remove = this.createIconButton(
+        item,
+        "x",
+        `${recipe.title} von den Lieblingsrezepten von ${person.name} entfernen`,
+      );
+      remove.addClass("cookbook-guest-favorite-remove");
+
+      remove.addEventListener("click", () => {
+        void this.removeFavoriteRecipe(person, recipe.id);
+      });
+    }
+
+    if (this.recipes.length === 0) {
+      section.createEl("small", {
+        cls: "setting-item-description",
+        text: "Keine Rezepte gefunden.",
+      });
+      return;
+    }
+
+    const addControls = section.createDiv("cookbook-guest-favorite-add");
+    const selectedRecipeIds = new Set(person.favoriteRecipeIds);
+    const availableRecipes = [...this.recipes]
+      .filter((recipe) => !selectedRecipeIds.has(recipe.id))
+      .sort((a, b) => a.title.localeCompare(b.title));
+
+    if (availableRecipes.length === 0) {
+      addControls.createEl("small", {
+        text: "Alle vorhandenen Rezepte sind bereits als Favoriten markiert.",
+      });
+      return;
+    }
+
+    const recipeSelect = addControls.createEl("select", {
+      attr: {
+        "aria-label": `Lieblingsrezept für ${person.name}`,
+      },
+    });
+
+    for (const recipe of availableRecipes) {
+      recipeSelect.createEl("option", {
+        text: recipe.title,
+        value: recipe.id,
+      });
+    }
+
+    const add = addControls.createEl("button", {
+      text: "Hinzufügen",
+    });
+
+    add.addEventListener("click", () => {
+      void this.addFavoriteRecipe(person, recipeSelect.value);
+    });
+  }
+
+  private async addFavoriteRecipe(
+    person: CookbookPerson,
+    recipeId: string,
+  ): Promise<void> {
+    if (person.favoriteRecipeIds.includes(recipeId)) {
+      this.plugin.notice("Dieses Rezept ist bereits als Lieblingsrezept eingetragen.");
+      return;
+    }
+
+    person.favoriteRecipeIds.push(recipeId);
+    await this.saveLibraryAndNotify();
+    await this.render();
+  }
+
+  private async removeFavoriteRecipe(
+    person: CookbookPerson,
+    recipeId: string,
+  ): Promise<void> {
+    person.favoriteRecipeIds = person.favoriteRecipeIds.filter(
+      (id) => id !== recipeId,
+    );
+
+    await this.saveLibraryAndNotify();
+    await this.render();
+  }
+
+  private async saveLibraryAndNotify(): Promise<void> {
     if (!this.library) {
       return;
     }
@@ -317,6 +649,7 @@ export class GuestSettingsModal extends Modal {
     };
 
     this.library.people.push(person);
+	this.expandedGuestIds.add(person.id);
 
     await this.plugin.saveLibrary(this.library);
     this.plugin.notice(`Guest "${name}" was added.`);

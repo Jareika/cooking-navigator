@@ -57,6 +57,29 @@ export class CookbookSettingTab extends PluginSettingTab {
         },
       },
       {
+        name: "Create JSON backups",
+        desc:
+          "Keeps two rotating backups for every cookbook JSON file written by the plugin. Missing original files can be restored automatically from the newest valid backup.",
+        control: {
+          type: "toggle" as const,
+          key: "enableJsonBackups",
+        },
+      },
+      {
+        name: "Cookbook backup folder",
+        desc:
+          "Folder for rotating JSON backups. The recommended default is a Backups folder inside the Cookbook folder.",
+        control: {
+          type: "folder" as const,
+          key: "backupFolder",
+          includeRoot: true,
+          validate: (value: string) =>
+            value.trim().length > 0
+              ? undefined
+              : "Please choose a backup folder.",
+        },
+      },
+      {
         name: "Show package suggestions",
         desc: "Show the critical package amount that changed the final recipe scale.",
         control: {

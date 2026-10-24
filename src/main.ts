@@ -16,12 +16,24 @@ import type {
   RecipeDocument,
 } from "./types";
 
+interface ObsidianSettingsView {
+  open(): void;
+  openTabById(id: string): void;
+}
+
+interface AppWithSettingsView {
+  setting: ObsidianSettingsView;
+}
+
 const DEFAULT_SETTINGS: CookbookSettings = {
   databaseFolder: "Cookbook",
   defaultRecipeFile: "recipes-main.json",
+  enableJsonBackups: true,
+  backupFolder: "Cookbook/Backups",
   showPackageSuggestions: true,
   showIngredientAllergens: true,
   preventSidePaneSwipes: true,
+  cookbookFocusMode: false,
   categoryButtons: [],
   guestButtons: [],
   allRecipesButtonImagePath: undefined,
@@ -180,6 +192,7 @@ export default class CookbookPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+	this.applyCookbookFocusMode();
 
     this.database = new CookbookDatabase(
       this.app.vault,
@@ -210,9 +223,15 @@ export default class CookbookPlugin extends Plugin {
     this.settingsTab = new CookbookSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
 
-    void this.refreshCategoryButtons();
+    this.app.workspace.onLayoutReady(() => {
+      void this.refreshCategoryButtons();
+    });
 	
     this.app.workspace.trigger("parse-style-settings");
+  }
+  
+  onunload(): void {
+    document.body.removeClass("cookbook-focus-mode");
   }
 
   async loadSettings(): Promise<void> {
@@ -225,6 +244,23 @@ export default class CookbookPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+  
+  isCookbookFocusModeEnabled(): boolean {
+    return this.settings.cookbookFocusMode;
+  }
+
+  async toggleCookbookFocusMode(): Promise<void> {
+    this.settings.cookbookFocusMode = !this.settings.cookbookFocusMode;
+    await this.saveSettings();
+    this.applyCookbookFocusMode();
+  }
+
+  private applyCookbookFocusMode(): void {
+    document.body.toggleClass(
+      "cookbook-focus-mode",
+      this.settings.cookbookFocusMode,
+    );
   }
 
   async createExampleDatabase(): Promise<void> {
@@ -379,9 +415,28 @@ export default class CookbookPlugin extends Plugin {
   openGuestSettings(onChanged: () => void): void {
     new GuestSettingsModal(this.app, this, onChanged).open();
   }
+  
+  openCookbookSettings(): void {
+    const appWithSettings = this.app as unknown as AppWithSettingsView;
+
+    appWithSettings.setting.open();
+    appWithSettings.setting.openTabById(this.manifest.id);
+  }
 
   resolveVaultImageUrl(imageUrl: string): string {
     return resolveImageUrl(this.app.vault, imageUrl);
+  }
+
+  async restoreLibraryFromBackup(): Promise<boolean> {
+    const restored = await this.database.restoreLibraryFromBackup();
+
+    this.notice(
+      restored
+        ? "Die Cookbook-Bibliothek wurde aus dem neuesten gültigen Backup wiederhergestellt."
+        : "Kein gültiges Backup der Cookbook-Bibliothek wurde gefunden.",
+    );
+
+    return restored;
   }
 
   private async syncCategoryButtons(

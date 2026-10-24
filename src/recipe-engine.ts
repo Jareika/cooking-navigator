@@ -4,12 +4,19 @@ import type {
   CookbookPerson,
   IngredientDefinition,
   Recipe,
+  RecipeIngredient,
   RecipeMatch,
   RecipePlan,
   ScaledIngredient,
 } from "./types";
 
 const EPSILON = 0.0001;
+
+interface IngredientResolution {
+  ingredient: IngredientDefinition;
+  originalIngredient: IngredientDefinition;
+  usesAlternative: boolean;
+}
 
 export function findRecipeMatches(
   recipes: Recipe[],
@@ -25,66 +32,47 @@ export function findRecipeMatches(
   );
 
   return recipes.map((recipe) => {
-    const recipeIngredientIds = getRecipeIngredientIds(recipe);
-    const recipeIngredients = [...recipeIngredientIds].map((ingredientId) => {
-      const ingredient = ingredientMap.get(ingredientId);
-
-      if (!ingredient) {
-        throw new Error(
-          `Recipe "${recipe.title}" references unknown ingredient "${ingredientId}".`,
-        );
-      }
-
-      return ingredient;
-    });
 
     const blockedBy: RecipeMatch["blockedBy"] = [];
 
-    for (const person of selectedPeople) {
-      for (const avoidance of person.avoidances) {
-        if (!recipe.restrictionScopeIds.includes(avoidance.scopeId)) {
+    for (const item of getRecipeIngredients(recipe)) {
+      const originalIngredient = getIngredientDefinition(
+        item.ingredientId,
+        recipe,
+        ingredientMap,
+      );
+      const alternativeIngredient = getAlternativeIngredient(
+        item,
+        recipe,
+        ingredientMap,
+      );
+
+      const originalBlockers = getIngredientBlockers(
+        originalIngredient,
+        recipe,
+        selectedPeople,
+        allergenMap,
+      );
+
+      if (originalBlockers.length === 0) {
+        continue;
+      }
+
+      if (alternativeIngredient) {
+        const alternativeBlockers = getIngredientBlockers(
+          alternativeIngredient,
+          recipe,
+          selectedPeople,
+          allergenMap,
+        );
+
+        if (alternativeBlockers.length === 0) {
           continue;
         }
 
-        for (const ingredientId of avoidance.ingredientIds) {
-          if (!recipeIngredientIds.has(ingredientId)) {
-            continue;
-          }
-
-          const ingredient = ingredientMap.get(ingredientId);
-
-          if (ingredient) {
-            blockedBy.push({
-              kind: "avoidance",
-              person,
-              ingredient,
-              scopeId: avoidance.scopeId,
-            });
-          }
-        }
-      }
-
-      for (const allergenId of person.intoleranceAllergenIds ?? []) {
-        const allergen = allergenMap.get(allergenId);
-
-        if (!allergen) {
-          throw new Error(
-            `Guest "${person.name}" references unknown allergen "${allergenId}".`,
-          );
-        }
-
-        for (const ingredient of recipeIngredients) {
-          if (!(ingredient.allergenIds ?? []).includes(allergenId)) {
-            continue;
-          }
-
-          blockedBy.push({
-            kind: "allergen",
-            person,
-            ingredient,
-            allergen,
-          });
-        }
+        blockedBy.push(...originalBlockers, ...alternativeBlockers);
+      } else {
+        blockedBy.push(...originalBlockers);
       }
     }
 
@@ -96,13 +84,145 @@ export function findRecipeMatches(
   });
 }
 
-function getRecipeIngredientIds(recipe: Recipe): Set<string> {
-  return new Set([
-    ...recipe.ingredients.map((ingredient) => ingredient.ingredientId),
+function getRecipeIngredients(recipe: Recipe): RecipeIngredient[] {
+  return [
+    ...recipe.ingredients,
     ...recipe.steps.flatMap((step) =>
-      step.ingredients.map((ingredient) => ingredient.ingredientId),
+      step.ingredients,
     ),
-  ]);
+  ];
+}
+
+function getIngredientDefinition(
+  ingredientId: string,
+  recipe: Recipe,
+  ingredientMap: Map<string, IngredientDefinition>,
+): IngredientDefinition {
+  const ingredient = ingredientMap.get(ingredientId);
+
+  if (!ingredient) {
+    throw new Error(
+      `Recipe "${recipe.title}" references unknown ingredient "${ingredientId}".`,
+    );
+  }
+
+  return ingredient;
+}
+
+function getAlternativeIngredient(
+  item: RecipeIngredient,
+  recipe: Recipe,
+  ingredientMap: Map<string, IngredientDefinition>,
+): IngredientDefinition | undefined {
+  if (!item.alternativeIngredientId) {
+    return undefined;
+  }
+
+  return getIngredientDefinition(
+    item.alternativeIngredientId,
+    recipe,
+    ingredientMap,
+  );
+}
+
+function getIngredientBlockers(
+  ingredient: IngredientDefinition,
+  recipe: Recipe,
+  selectedPeople: CookbookPerson[],
+  allergenMap: Map<string, AllergenDefinition>,
+): RecipeMatch["blockedBy"] {
+  const blockers: RecipeMatch["blockedBy"] = [];
+
+  for (const person of selectedPeople) {
+    for (const avoidance of person.avoidances) {
+      if (
+        recipe.restrictionScopeIds.includes(avoidance.scopeId) &&
+        avoidance.ingredientIds.includes(ingredient.id)
+      ) {
+        blockers.push({
+          kind: "avoidance",
+          person,
+          ingredient,
+          scopeId: avoidance.scopeId,
+        });
+      }
+    }
+
+    for (const allergenId of person.intoleranceAllergenIds ?? []) {
+      const allergen = allergenMap.get(allergenId);
+
+      if (!allergen) {
+        throw new Error(
+          `Guest "${person.name}" references unknown allergen "${allergenId}".`,
+        );
+      }
+
+      if ((ingredient.allergenIds ?? []).includes(allergenId)) {
+        blockers.push({
+          kind: "allergen",
+          person,
+          ingredient,
+          allergen,
+        });
+      }
+    }
+  }
+
+  return blockers;
+}
+
+function resolveIngredient(
+  item: RecipeIngredient,
+  recipe: Recipe,
+  selectedPeople: CookbookPerson[],
+  ingredientMap: Map<string, IngredientDefinition>,
+  allergenMap: Map<string, AllergenDefinition>,
+): IngredientResolution {
+  const originalIngredient = getIngredientDefinition(
+    item.ingredientId,
+    recipe,
+    ingredientMap,
+  );
+  const alternativeIngredient = getAlternativeIngredient(
+    item,
+    recipe,
+    ingredientMap,
+  );
+
+  const originalBlockers = getIngredientBlockers(
+    originalIngredient,
+    recipe,
+    selectedPeople,
+    allergenMap,
+  );
+
+  if (originalBlockers.length === 0) {
+    return {
+      ingredient: originalIngredient,
+      originalIngredient,
+      usesAlternative: false,
+    };
+  }
+
+  if (
+    alternativeIngredient &&
+    getIngredientBlockers(
+      alternativeIngredient,
+      recipe,
+      selectedPeople,
+      allergenMap,
+    ).length === 0
+  ) {
+    return {
+      ingredient: alternativeIngredient,
+      originalIngredient,
+      usesAlternative: true,
+    };
+  }
+
+  throw new Error(
+    `Recipe "${recipe.title}" is not compatible with the selected guests.`,
+  );
 }
 
 export function buildRecipePlan(
@@ -127,7 +247,9 @@ export function buildRecipePlan(
 
   const packageAnchor = findPackageAnchor(
     recipe,
+	selectedPeople,
     ingredientMap,
+	allergenMap,
     requestedScaleFactor,
   );
 
@@ -138,30 +260,28 @@ export function buildRecipePlan(
       )
     : requestedScaleFactor;
 
-  const scale = (item: {
-    ingredientId: string;
-    amount: number;
-    unit?: string;
-    note?: string;
-  }): ScaledIngredient => {
-    const ingredient = ingredientMap.get(item.ingredientId);
-
-    if (!ingredient) {
-      throw new Error(
-        `Recipe "${recipe.title}" references unknown ingredient "${item.ingredientId}".`,
-      );
-    }
+  const scale = (item: RecipeIngredient): ScaledIngredient => {
+    const resolved = resolveIngredient(
+      item,
+      recipe,
+      selectedPeople,
+      ingredientMap,
+      allergenMap,
+    );
 
     const scaledAmount = item.amount * scaleFactor;
     const allergens = resolveIngredientAllergens(
-      ingredient,
+      resolved.ingredient,
       allergenMap,
     );
 
     return {
       ...item,
-      ingredient,
-	  allergens,
+      ingredientId: resolved.ingredient.id,
+      ingredient: resolved.ingredient,
+      originalIngredient: resolved.originalIngredient,
+      usesAlternative: resolved.usesAlternative,
+      allergens,
       scaledAmount,
       displayAmount: roundForDisplay(scaledAmount),
     };
@@ -205,7 +325,9 @@ function resolveIngredientAllergens(
 
 function findPackageAnchor(
   recipe: Recipe,
+  selectedPeople: CookbookPerson[],
   ingredientMap: Map<string, IngredientDefinition>,
+  allergenMap: Map<string, AllergenDefinition>,
   requestedScaleFactor: number,
 ):
   | {
@@ -215,19 +337,16 @@ function findPackageAnchor(
 	  resultingScale: number;
     }
   | undefined {
-  const recipeIngredients = recipe.ingredients
-    .map((item) => ({
-      recipeIngredient: item,
-      ingredient: ingredientMap.get(item.ingredientId),
-    }))
-    .filter(
-      (
-        entry,
-      ): entry is {
-        recipeIngredient: Recipe["ingredients"][number];
-        ingredient: IngredientDefinition;
-      } => Boolean(entry.ingredient),
-    );
+  const recipeIngredients = recipe.ingredients.map((recipeIngredient) => ({
+    recipeIngredient,
+    ingredient: resolveIngredient(
+      recipeIngredient,
+      recipe,
+      selectedPeople,
+      ingredientMap,
+      allergenMap,
+    ).ingredient,
+  }));
 
   const primary = recipeIngredients.filter(
     (entry) => entry.ingredient.resourcePriority === "primary",
