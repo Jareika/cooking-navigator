@@ -1,11 +1,31 @@
 export type ResourcePriority = "none" | "primary" | "secondary";
 export type ImagePlacement = "cover" | "after-ingredients";
+export type ShoppingStoreMode =
+  | "favorite-first"
+  | "fewest-stores"
+  | "ingredient-stores";
+  
+export interface RecipeScaleOverride {
+  ingredientId: string;
+  targetAmount: number;
+  unit: string;
+  scaleFactor: number;
+}
+
+export interface ManualShoppingItem {
+  id: string;
+  name: string;
+  amount?: number;
+  unit?: string;
+}
 
 export interface CookbookSettings {
   databaseFolder: string;
   defaultRecipeFile: string;
   enableJsonBackups: boolean;
+  jsonBackupCount: number;
   backupFolder: string;
+  confirmShoppingPlanningReset: boolean;
   showPackageSuggestions: boolean;
   showIngredientAllergens: boolean;
   preventSidePaneSwipes: boolean;
@@ -13,6 +33,17 @@ export interface CookbookSettings {
   categoryButtons: CategoryButtonSettings[];
   guestButtons: GuestButtonSettings[];
   allRecipesButtonImagePath?: string;
+  shoppingRecipeIds: string[];
+  activeGuestIds: string[];
+  manualRecipeScaleOverrides: Record<string, RecipeScaleOverride>;
+  shoppingStoreMode: ShoppingStoreMode;
+  shoppingLocationId?: string;
+  favoriteStoreId?: string;
+  shoppingListEmailRecipient?: string;
+  shoppingExcludedIngredientIds: string[];
+  manualShoppingItems: ManualShoppingItem[];
+  timerAlarmSoundPath?: string;
+  timerAlarmVolume: number;
 }
 
 export interface CategoryButtonSettings {
@@ -44,12 +75,32 @@ export interface IngredientDefinition {
   defaultUnitPlural?: string;
   resourcePriority: ResourcePriority;
   allergenIds?: string[];
+  
+  /**
+   * Märkte, in denen diese Zutat erhältlich ist.
+   *
+   * undefined: in allen konfigurierten Märkten erhältlich
+   * []: noch keinem Markt zugeordnet
+   */
+  storeIds?: string[];
 
   /**
    * Available package sizes in the ingredient's default unit.
    * Example for minced meat: [400, 500].
    */
   packageSizes?: number[];
+  
+  /**
+   * Packungsgrößen je Supermarkt. Ein Eintrag überschreibt für diesen Markt
+   * die allgemeinen packageSizes der Zutat.
+   *
+   * Beispiel:
+   * {
+   *   "aldi-haseluenne": [400],
+   *   "edeka-haseluenne": [200, 500]
+   * }
+   */
+  storePackageSizes?: Record<string, number[]>;
 
   /**
    * When a calculated amount reaches this ratio of the next possible
@@ -90,11 +141,25 @@ export interface AllergenDefinition {
   name: string;
 }
 
+export interface StoreDefinition {
+  id: string;
+  name: string;
+  locationId?: string;
+  color?: string;
+}
+
+export interface ShoppingLocation {
+  id: string;
+  name: string;
+}
+
 export interface CookbookLibrary {
   version: 1;
   categories: RecipeCategory[];
   restrictionScopes: RestrictionScope[];
   allergens?: AllergenDefinition[];
+  shoppingLocations?: ShoppingLocation[];
+  markets?: StoreDefinition[];
   ingredients: IngredientDefinition[];
   people: CookbookPerson[];
 }

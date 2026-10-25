@@ -1,9 +1,7 @@
 import {
   ItemView,
-  normalizePath,
   Platform,
   setIcon,
-  TFile,
   WorkspaceLeaf,
 } from "obsidian";
 import type CookbookPlugin from "./main";
@@ -11,18 +9,28 @@ import { resolveImageUrl } from "./image-utils";
 import type {
   CookbookLibrary,
   CookbookPerson,
+  ManualShoppingItem,
   Recipe,
   RecipeMatch,
   RecipePlan,
   ScaledIngredient,
 } from "./types";
 import { buildRecipePlan, findRecipeMatches } from "./recipe-engine";
+import { RecipeScaleModal } from "./recipe-scale-modal";
+import { ResetShoppingPlanningModal } from "./reset-shopping-planning-modal";
+import {
+  buildShoppingList,
+  createShoppingStorePlan,
+  getResolvedRecipeIngredientIds,
+} from "./shopping-list";
+import type { CookingTimerSnapshot } from "./cooking-timer";
 
 export const COOKBOOK_VIEW_TYPE = "cookbook-browser-view";
 
 type Screen =
   | { kind: "browser" }
   | { kind: "guests" }
+  | { kind: "shopping" }
   | { kind: "cook"; recipe: Recipe; page: number };
 
 export class CookbookView extends ItemView {
@@ -32,6 +40,11 @@ export class CookbookView extends ItemView {
   private selectedCategoryId: string | null = null;
   private screen: Screen = { kind: "browser" };
   private styleSettingsObserver: MutationObserver | null = null;
+  private browserCategoryListEl: HTMLElement | null = null;
+  private browserRecipeGridEl: HTMLElement | null = null;
+  private guestListEl: HTMLElement | null = null;
+  private shoppingContentEl: HTMLElement | null = null;
+  private timerUnsubscribers: Array<() => void> = [];
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -60,12 +73,14 @@ export class CookbookView extends ItemView {
   async onClose(): Promise<void> {
     this.styleSettingsObserver?.disconnect();
     this.styleSettingsObserver = null;
+	this.disposeTimerSubscriptions();
   }
 
   async reload(): Promise<void> {
     try {
       this.library = await this.plugin.loadLibrary();
       this.recipes = await this.plugin.database.loadRecipes();
+	  this.restoreSelectedPeople();
       this.render();
     } catch (error) {
       this.renderError(error);
@@ -124,27 +139,73 @@ export class CookbookView extends ItemView {
   }
 
   private render(): void {
+    const scrollPosition = this.captureScrollPosition();
+
     try {
       if (!this.library) {
         return;
       }
+	  
+	  this.disposeTimerSubscriptions();
+	  
+      this.browserCategoryListEl = null;
+      this.browserRecipeGridEl = null;
+      this.guestListEl = null;
+      this.shoppingContentEl = null;
 
       this.containerEl.empty();
 
       if (this.screen.kind === "browser") {
         this.renderBrowser();
-        return;
-      }
-	  
-      if (this.screen.kind === "guests") {
+      } else if (this.screen.kind === "guests") {
         this.renderGuestSelection();
+      } else if (this.screen.kind === "shopping") {
+        this.renderShoppingList();
+      } else {
+        this.renderCookingMode(this.screen.recipe, this.screen.page);
         return;
       }
 
-      this.renderCookingMode(this.screen.recipe, this.screen.page);
+      this.restoreScrollPosition(scrollPosition);
     } catch (error) {
       this.renderError(error);
     }
+  }
+  
+  /**
+   * Die View wird für Zustandsänderungen bewusst neu aufgebaut. Damit etwa
+   * beim Abhaken oder Hinzufügen von Einkaufspositionen die Ansicht nicht
+   * wieder an den Anfang springt, wird die Scroll-Position wiederhergestellt.
+   */
+  private captureScrollPosition(): {
+    containerTop: number;
+    rootTop: number;
+  } {
+    const root = this.containerEl.querySelector<HTMLElement>(
+      ".cookbook-root",
+    );
+
+    return {
+      containerTop: this.containerEl.scrollTop,
+      rootTop: root?.scrollTop ?? 0,
+    };
+  }
+
+  private restoreScrollPosition(position: {
+    containerTop: number;
+    rootTop: number;
+  }): void {
+    window.requestAnimationFrame(() => {
+      const root = this.containerEl.querySelector<HTMLElement>(
+        ".cookbook-root",
+      );
+
+      this.containerEl.scrollTop = position.containerTop;
+
+      if (root) {
+        root.scrollTop = position.rootTop;
+      }
+    });
   }
 
   private renderBrowser(): void {
@@ -157,10 +218,40 @@ export class CookbookView extends ItemView {
     });
     const content = root.createDiv("cookbook-browser-content");
     const layout = content.createDiv("cookbook-browser-layout");
-    const categoryList = layout.createDiv("cookbook-category-list");
-    const grid = layout.createDiv("cookbook-recipe-grid");
+    this.browserCategoryListEl = layout.createDiv("cookbook-category-list");
+    this.browserRecipeGridEl = layout.createDiv("cookbook-recipe-grid");
 
     this.renderBrowserActions(root);
+    this.renderBrowserCategories();
+    this.renderBrowserRecipeGrid();
+  }
+ 
+  /**
+   * Aktualisiert ausschließlich Filter und Rezeptkarten. Der äußere
+   * Cookbook-Screen bleibt erhalten; dadurch entstehen weder Leerbild noch
+   * ein sichtbarer Scroll-Sprung durch containerEl.empty().
+   */
+  private refreshBrowserContent(): void {
+    if (
+      this.screen.kind !== "browser" ||
+      !this.browserCategoryListEl ||
+      !this.browserRecipeGridEl
+    ) {
+      this.render();
+      return;
+    }
+
+    this.renderBrowserCategories();
+    this.renderBrowserRecipeGrid();
+  }
+
+  private renderBrowserCategories(): void {
+    if (!this.library || !this.browserCategoryListEl) {
+      return;
+    }
+
+    const categoryList = this.browserCategoryListEl;
+    categoryList.empty();
 
     const allCategoriesButton = this.createCategoryButton(categoryList, {
       cls: [
@@ -197,7 +288,7 @@ export class CookbookView extends ItemView {
 
     allCategoriesButton.addEventListener("click", () => {
       this.selectedCategoryId = null;
-      this.render();
+      this.refreshBrowserContent();
     });
 
     for (const { category, imagePath } of this.plugin.getOrderedCategories(
@@ -235,9 +326,18 @@ export class CookbookView extends ItemView {
 
       button.addEventListener("click", () => {
         this.selectedCategoryId = category.id;
-        this.render();
+        this.refreshBrowserContent();
       });
     }
+  }
+
+  private renderBrowserRecipeGrid(): void {
+    if (!this.library || !this.browserRecipeGridEl) {
+      return;
+    }
+
+    const grid = this.browserRecipeGridEl;
+    grid.empty();
 
     const selectedPeople = this.getSelectedPeople();
     const matches = findRecipeMatches(
@@ -245,6 +345,8 @@ export class CookbookView extends ItemView {
       this.library,
       selectedPeople,
     );
+	
+    const shoppingIngredientIds = this.getShoppingIngredientIds(selectedPeople);
 
     const visibleRecipes = matches.filter(
       (match) =>
@@ -262,7 +364,12 @@ export class CookbookView extends ItemView {
     }
 
     for (const match of visibleRecipes) {
-      this.renderRecipeCard(grid, match, selectedPeople);
+      this.renderRecipeCard(
+        grid,
+        match,
+        selectedPeople,
+        shoppingIngredientIds,
+      );
     }
   }
   
@@ -283,7 +390,32 @@ export class CookbookView extends ItemView {
         "Selected guests determine recipe restrictions, favourites, and portion sizes.",
     });
 
-    const guestList = content.createDiv("cookbook-guest-list");
+    this.guestListEl = content.createDiv("cookbook-guest-list");
+    this.renderGuestList();
+
+    this.renderBrowserActions(root);
+  }
+
+  /**
+   * Die Gästeseite bleibt bestehen. Beim Auswählen wird nur die Liste der
+   * Gästekarten aktualisiert, nicht die gesamte ItemView.
+   */
+  private refreshGuestList(): void {
+    if (this.screen.kind !== "guests" || !this.guestListEl) {
+      this.render();
+      return;
+    }
+
+    this.renderGuestList();
+  }
+
+  private renderGuestList(): void {
+    if (!this.library || !this.guestListEl) {
+      return;
+    }
+
+    const guestList = this.guestListEl;
+    guestList.empty();
 
     for (const { person, imagePath } of this.plugin.getOrderedPeople(
       this.library.people,
@@ -331,17 +463,9 @@ export class CookbookView extends ItemView {
       }
 
       button.addEventListener("click", () => {
-        if (this.selectedPersonIds.has(person.id)) {
-          this.selectedPersonIds.delete(person.id);
-        } else {
-          this.selectedPersonIds.add(person.id);
-        }
-
-        this.render();
+        void this.toggleSelectedPerson(person.id);
       });
     }
-
-    this.renderBrowserActions(root);
   }
 
   private renderBrowserActions(parent: HTMLElement): void {
@@ -401,6 +525,115 @@ export class CookbookView extends ItemView {
         kind: isGuestSelection ? "browser" : "guests",
       };
       this.render();
+    });
+	
+    const isShoppingList = this.screen.kind === "shopping";
+    const shoppingButton = actions.createEl("button", {
+      cls: [
+        "cookbook-browser-action",
+        "cookbook-shopping-list-action",
+        isShoppingList ? "is-active" : "",
+      ],
+      attr: {
+        "aria-label": isShoppingList
+          ? "Zur Rezeptübersicht"
+          : "Einkaufsliste öffnen",
+        "aria-pressed": String(isShoppingList),
+        title: isShoppingList
+          ? "Zur Rezeptübersicht"
+          : "Einkaufsliste öffnen",
+      },
+    });
+
+    setIcon(shoppingButton, isShoppingList ? "book-open" : "shopping-cart");
+
+    shoppingButton.addEventListener("click", () => {
+      this.screen = {
+        kind: isShoppingList ? "browser" : "shopping",
+      };
+      this.render();
+    });
+	
+    if (this.screen.kind === "cook") {
+      const recipe = this.screen.recipe;
+
+      const scaleButton = actions.createEl("button", {
+        cls: [
+          "cookbook-browser-action",
+          "cookbook-recipe-scale-action",
+          this.plugin.getRecipeScaleOverride(recipe.id)
+            ? "is-active"
+            : "",
+        ],
+        attr: {
+          "aria-label": "Rezept manuell skalieren",
+          title: "Rezept manuell skalieren",
+        },
+      });
+
+      setIcon(scaleButton, "scale");
+
+      scaleButton.addEventListener("click", () => {
+        const selectedPeople = this.getSelectedPeople();
+        const packageStoreIds = this.getRecipePackageStoreIds(
+          recipe,
+          selectedPeople,
+        );
+
+        new RecipeScaleModal(
+          this.app,
+          this.plugin,
+          recipe,
+          selectedPeople,
+          this.getRecipePlanOptions(
+            recipe,
+            packageStoreIds,
+          ),
+          () => this.render(),
+        ).open();
+      });
+    }
+	
+    const hasShoppingPlanningState =
+      this.plugin.getShoppingRecipeIds().length > 0 ||
+      this.plugin.getShoppingExcludedIngredientIds().length > 0 ||
+      this.plugin.getActiveGuestIds().length > 0 ||
+      Object.keys(this.plugin.settings.manualRecipeScaleOverrides).length > 0 ||
+      Boolean(this.plugin.settings.shoppingLocationId);
+
+    if (hasShoppingPlanningState) {
+      const resetShoppingPlanningButton = actions.createEl("button", {
+        cls: [
+          "cookbook-browser-action",
+          "cookbook-reset-shopping-planning-action",
+        ],
+        attr: {
+          "aria-label": "Einkaufsplanung zurücksetzen",
+          title: "Einkaufsplanung zurücksetzen",
+        },
+      });
+
+      setIcon(resetShoppingPlanningButton, "rotate-ccw");
+
+      resetShoppingPlanningButton.addEventListener("click", () => {
+        void this.requestShoppingPlanningReset();
+      });
+    }
+	
+    const manageIngredientsButton = actions.createEl("button", {
+      cls: [
+        "cookbook-browser-action",
+        "cookbook-manage-ingredients-action",
+      ],
+      attr: {
+        "aria-label": "Zutaten, Einkaufsorte und Supermärkte verwalten",
+        title: "Zutaten, Einkaufsorte und Supermärkte verwalten",
+      },
+    });
+
+    setIcon(manageIngredientsButton, "carrot");
+    manageIngredientsButton.addEventListener("click", () => {
+      this.plugin.openIngredientManagement(() => void this.reload());
     });
 
     const manageGuestsButton = actions.createEl("button", {
@@ -499,9 +732,23 @@ export class CookbookView extends ItemView {
     parent: HTMLElement,
     match: RecipeMatch,
     selectedPeople: CookbookPerson[],
+	shoppingIngredientIds: Set<string>,
   ): void {
     const recipe = match.recipe;
-    const card = parent.createEl("button", {
+    const recipeIngredientIds = this.getRecipeIngredientIds(
+      recipe,
+      selectedPeople,
+    );
+    const matchingIngredientCount = [...recipeIngredientIds].filter((id) =>
+      shoppingIngredientIds.has(id),
+    ).length;
+    const hasAllIngredientsInShoppingList =
+      recipeIngredientIds.size > 0 &&
+      matchingIngredientCount === recipeIngredientIds.size;
+    const isInShoppingList = this.plugin.isRecipeInShoppingList(recipe.id);
+
+    const row = parent.createDiv("cookbook-recipe-card-row");
+    const card = row.createEl("button", {
       cls: "cookbook-recipe-card",
     });
 
@@ -531,6 +778,548 @@ export class CookbookView extends ItemView {
       this.screen = { kind: "cook", recipe, page: 0 };
       this.render();
     });
+
+    const shoppingButton = row.createEl("button", {
+      cls: [
+        "cookbook-recipe-shopping-button",
+        isInShoppingList ? "is-in-shopping-list" : "",
+        hasAllIngredientsInShoppingList ? "is-complete" : "",
+      ],
+      attr: {
+        "aria-label": isInShoppingList
+          ? `${recipe.title} aus der Einkaufsliste entfernen`
+          : `${recipe.title} zur Einkaufsliste hinzufügen`,
+        title:
+          recipeIngredientIds.size > 0
+            ? `${matchingIngredientCount} von ${recipeIngredientIds.size} Zutaten liegen bereits in der Einkaufsliste`
+            : "Keine Zutaten vorhanden",
+      },
+    });
+
+    setIcon(shoppingButton, isInShoppingList ? "shopping-cart" : "plus");
+
+    shoppingButton.createSpan({
+      cls: "cookbook-recipe-shopping-overlap",
+      text: `${matchingIngredientCount}/${recipeIngredientIds.size}`,
+    });
+
+    shoppingButton.addEventListener("click", () => {
+      void this.toggleRecipeShoppingList(recipe);
+    });
+  }
+  
+  private async toggleRecipeShoppingList(recipe: Recipe): Promise<void> {
+    const isInShoppingList =
+      await this.plugin.toggleRecipeInShoppingList(recipe.id);
+
+    this.plugin.notice(
+      isInShoppingList
+        ? `"${recipe.title}" wurde zur Einkaufsliste hinzugefügt.`
+        : `"${recipe.title}" wurde aus der Einkaufsliste entfernt.`,
+    );
+
+    if (this.screen.kind === "browser") {
+      this.renderBrowserRecipeGrid();
+      return;
+    }
+
+    if (this.screen.kind === "shopping") {
+      this.refreshShoppingList();
+      return;
+    }
+
+    this.render();
+  }
+
+  private getRecipeIngredientIds(
+    recipe: Recipe,
+    selectedPeople: CookbookPerson[],
+  ): Set<string> {
+    if (!this.library) {
+      return new Set();
+    }
+
+    return getResolvedRecipeIngredientIds(
+      recipe,
+      this.library,
+      selectedPeople,
+    );
+  }
+
+  private getShoppingIngredientIds(
+    selectedPeople: CookbookPerson[],
+  ): Set<string> {
+    if (!this.library) {
+      return new Set();
+    }
+
+    const recipeIds = new Set(this.plugin.getShoppingRecipeIds());
+    const ingredientIds = new Set<string>();
+
+    for (const recipe of this.recipes) {
+      if (!recipeIds.has(recipe.id)) {
+        continue;
+      }
+
+      try {
+        for (const ingredientId of this.getRecipeIngredientIds(
+          recipe,
+          selectedPeople,
+        )) {
+          ingredientIds.add(ingredientId);
+        }
+      } catch {
+        // Rezept kann nach einer Gästeänderung inkompatibel geworden sein.
+      }
+    }
+
+    return ingredientIds;
+  }
+
+  private renderShoppingList(): void {
+    if (!this.library) {
+      return;
+    }
+
+    const root = this.containerEl.createDiv({
+      cls: ["cookbook-root", "cookbook-browser-screen"],
+    });
+    const content = root.createDiv("cookbook-browser-content");
+    this.renderBrowserActions(root);
+
+    content.createEl("h2", { text: "Einkaufsliste" });
+
+    /**
+     * Alles unterhalb der Überschrift ist dynamisch. Der Screen, die
+     * Action-Bar und die Überschrift bleiben bei Änderungen erhalten.
+     */
+    this.shoppingContentEl = content.createDiv(
+      "cookbook-shopping-dynamic-content",
+    );
+
+    this.renderShoppingListContent();
+  }
+
+  /**
+   * Aktualisiert nur den veränderlichen Einkaufslistenbereich.
+   *
+   * Wichtig: Es wird absichtlich nicht this.render() aufgerufen. Dadurch
+   * bleibt .cookbook-root inklusive seiner Scrollposition im DOM erhalten.
+   */
+  private refreshShoppingList(): void {
+    if (this.screen.kind !== "shopping" || !this.shoppingContentEl) {
+      this.render();
+      return;
+    }
+
+    this.renderShoppingListContent();
+  }
+
+  private renderShoppingListContent(): void {
+    if (!this.library || !this.shoppingContentEl) {
+      return;
+    }
+
+    const content = this.shoppingContentEl;
+    content.empty();
+	
+    const locations = this.library.shoppingLocations ?? [];
+    const selectedLocationId = this.plugin.settings.shoppingLocationId;
+
+    if (locations.length > 0) {
+      const locationField = content.createEl("label", {
+        cls: "cookbook-shopping-location-field",
+        text: "Einkaufsort",
+      });
+
+      const locationSelect = locationField.createEl("select", {
+        attr: {
+          "aria-label": "Einkaufsort auswählen",
+        },
+      });
+
+      locationSelect.createEl("option", {
+        value: "",
+        text: "Bitte einen Ort auswählen",
+      });
+
+      for (const location of locations) {
+        locationSelect.createEl("option", {
+          value: location.id,
+          text: location.name,
+        });
+      }
+
+      locationSelect.value = selectedLocationId ?? "";
+
+      locationSelect.addEventListener("change", () => {
+        void this.plugin
+          .setShoppingLocation(locationSelect.value || undefined)
+          .then(() => this.refreshShoppingList());
+      });
+    }
+
+    const recipeIds = new Set(this.plugin.getShoppingRecipeIds());
+    const recipes = this.recipes.filter((recipe) => recipeIds.has(recipe.id));
+	const manualItems = this.plugin.getManualShoppingItems();
+
+    if (recipes.length === 0 && manualItems.length === 0) {
+      content.createDiv({
+        cls: "cookbook-empty-state",
+        text: "Deine Einkaufsliste ist noch leer.",
+      });
+      return;
+    }
+
+    this.renderManualShoppingItems(content, manualItems);
+
+    const selectedPeople = this.getSelectedPeople();
+    /**
+     * Die Marktauswahl hängt nur von der Verfügbarkeit ab, nicht von den
+     * skalierten Mengen. Deshalb wird zunächst eine neutrale Liste erstellt,
+     * daraus der Marktplan bestimmt und anschließend mit den passenden
+     * Markt-Packungsgrößen erneut skaliert.
+     */
+    const unscaledItems = buildShoppingList(
+      recipes,
+      this.library,
+      selectedPeople,
+    );
+
+    const marketsAtSelectedLocation = selectedLocationId
+      ? this.plugin.getKnownMarkets(selectedLocationId)
+      : this.library.markets ?? [];
+
+    const excludedIngredientIds = new Set(
+      this.plugin.getShoppingExcludedIngredientIds(),
+    );
+
+    const activeUnscaledItems = unscaledItems.filter(
+      (item) => !excludedIngredientIds.has(item.ingredient.id),
+    );
+
+    const activeStorePlan = createShoppingStorePlan(
+      activeUnscaledItems,
+      this.library,
+      this.plugin.settings.shoppingStoreMode,
+      this.plugin.settings.favoriteStoreId,
+      marketsAtSelectedLocation.map((market) => market.id),
+    );
+
+    const allItems = buildShoppingList(
+      recipes,
+      this.library,
+      selectedPeople,
+      {
+        getRecipePlanOptions: (recipe) =>
+          this.getRecipePlanOptions(
+            recipe,
+            activeStorePlan.marketIds,
+          ),
+      },
+    );
+	
+    const items = allItems.filter(
+      (item) => !excludedIngredientIds.has(item.ingredient.id),
+    );
+
+    const marketById = new Map(
+      marketsAtSelectedLocation.map((market) => [market.id, market]),
+    );
+
+    const recipeList = content.createDiv("cookbook-shopping-recipes");
+    recipeList.createEl("strong", { text: "Rezepte" });
+
+    if (recipes.length === 0) {
+      recipeList.createEl("small", {
+        text: "Noch keine Rezepte ausgewählt.",
+      });
+    } else {
+      for (const recipe of recipes) {
+        const recipeRow = recipeList.createDiv("cookbook-shopping-recipe");
+        recipeRow.createSpan({ text: recipe.title });
+      
+        recipeRow.createEl("small", {
+          cls: "cookbook-shopping-recipe-scale",
+          text: this.getRecipeScaleDescription(
+            recipe,
+            selectedPeople,
+            activeStorePlan.marketIds,
+          ),
+        });
+
+      const removeButton = recipeRow.createEl("button", {
+        cls: "clickable-icon",
+        attr: {
+          "aria-label": `${recipe.title} aus der Einkaufsliste entfernen`,
+          title: "Aus Einkaufsliste entfernen",
+        },
+      });
+
+        setIcon(removeButton, "x");
+        removeButton.addEventListener("click", () => {
+          void this.toggleRecipeShoppingList(recipe);
+        });
+      }
+    }
+
+    if (activeStorePlan.marketIds.length > 0) {
+      const stores = activeStorePlan.marketIds
+        .map((marketId) => marketById.get(marketId)?.name ?? marketId)
+        .join(", ");
+
+      content.createDiv({
+        cls: "cookbook-shopping-store-plan",
+        text: activeStorePlan.usedFallback
+          ? `Dein Favoritenmarkt reicht nicht aus. Empfohlene Märkte: ${stores}`
+          : `Empfohlene Märkte: ${stores}`,
+      });
+    }
+
+    if (activeStorePlan.missingIngredients.length > 0) {
+      content.createDiv({
+        cls: "cookbook-shopping-warning",
+        text: selectedLocationId
+          ? `Am gewählten Ort nicht verfügbar oder nicht zugeordnet: ${activeStorePlan.missingIngredients
+              .map((ingredient) => ingredient.name)
+              .join(", ")}`
+          : `Ohne Marktzuordnung: ${activeStorePlan.missingIngredients
+          .map((ingredient) => ingredient.name)
+          .join(", ")}`,
+      });
+    }
+
+    const list = content.createDiv("cookbook-shopping-items");
+
+    for (const item of items) {
+      const row = list.createDiv("cookbook-shopping-item");
+      row.createEl("strong", { text: item.ingredient.name });
+
+      row.createSpan({
+        text: `${formatNumber(item.amount)} ${item.unit}`,
+      });
+	  
+      const removeButton = row.createEl("button", {
+        cls: "clickable-icon cookbook-shopping-item-remove",
+        attr: {
+          "aria-label": `${item.ingredient.name} als zuhause vorhanden markieren`,
+          title: "Habe ich zuhause",
+        },
+      });
+
+      setIcon(removeButton, "house");
+
+      removeButton.addEventListener("click", () => {
+        void this.plugin
+          .setShoppingIngredientExcluded(item.ingredient.id, true)
+          .then(() => this.refreshShoppingList());
+      });
+
+      if (this.plugin.settings.shoppingStoreMode === "ingredient-stores") {
+        const marketNames = item.marketIds
+          .filter((marketId) => marketById.has(marketId))
+          .map((marketId) => marketById.get(marketId)?.name ?? marketId)
+          .join(", ");
+
+        row.createEl("small", {
+          text: marketNames || "Am gewählten Ort nicht verfügbar",
+        });
+      }
+
+      if (item.notes.length > 0) {
+        row.createEl("small", {
+          cls: "cookbook-shopping-note",
+          text: item.notes.join(" · "),
+        });
+      }
+    }
+	
+    const excludedItems = allItems.filter((item) =>
+      excludedIngredientIds.has(item.ingredient.id),
+    );
+
+    if (excludedItems.length > 0) {
+      const excludedSection = content.createDiv(
+        "cookbook-shopping-excluded-items",
+      );
+
+      excludedSection.createEl("strong", {
+        text: "Bereits zuhause",
+      });
+
+      for (const item of excludedItems) {
+        const row = excludedSection.createDiv(
+          "cookbook-shopping-excluded-item",
+        );
+
+        row.createSpan({
+          text: `${item.ingredient.name} (${formatNumber(item.amount)} ${item.unit})`,
+        });
+
+        const restoreButton = row.createEl("button", {
+          text: "Wieder einkaufen",
+        });
+
+        restoreButton.addEventListener("click", () => {
+          void this.plugin
+            .setShoppingIngredientExcluded(item.ingredient.id, false)
+            .then(() => this.refreshShoppingList());
+        });
+      }
+    }
+
+    const emailButton = content.createEl("button", {
+      text: "Einkaufsliste per E-Mail öffnen",
+      cls: "mod-cta cookbook-shopping-email-button",
+    });
+
+    if (!this.plugin.settings.shoppingListEmailRecipient) {
+      emailButton.disabled = true;
+      content.createEl("small", {
+        cls: "cookbook-shopping-email-hint",
+        text:
+          "Bitte zuerst unter Einstellungen eine Empfängeradresse für Einkaufslisten hinterlegen.",
+      });
+      return;
+    }
+
+    emailButton.addEventListener("click", () => {
+      const recipient = this.plugin.settings.shoppingListEmailRecipient;
+
+      if (!recipient) {
+        return;
+      }
+
+      const body = formatShoppingEmail(
+        recipes.map((recipe) => ({
+          title: recipe.title,
+          scaleDescription: this.getRecipeScaleDescription(
+            recipe,
+            selectedPeople,
+            activeStorePlan.marketIds,
+          ),
+        })),
+        items,
+		manualItems,
+        activeStorePlan.marketIds.map(
+          (marketId) => marketById.get(marketId)?.name ?? marketId,
+        ),
+      );
+
+      window.location.href =
+        `mailto:${encodeURIComponent(recipient)}` +
+        `?subject=${encodeURIComponent("Einkaufsliste")}` +
+        `&body=${encodeURIComponent(body)}`;
+    });
+  }
+  
+  private renderManualShoppingItems(
+    parent: HTMLElement,
+    manualItems: ManualShoppingItem[],
+  ): void {
+    const section = parent.createDiv("cookbook-shopping-manual-section");
+    section.createEl("strong", { text: "Manuell hinzufügen" });
+
+    const form = section.createDiv("cookbook-shopping-manual-form");
+
+    const nameInput = form.createEl("input", {
+      attr: {
+        type: "text",
+        placeholder: "z. B. Spülmittel",
+        "aria-label": "Artikelname",
+      },
+    });
+
+    const amountInput = form.createEl("input", {
+      attr: {
+        type: "number",
+        min: "0",
+        step: "0.1",
+        placeholder: "Menge",
+        "aria-label": "Menge, optional",
+      },
+    });
+
+    const unitInput = form.createEl("input", {
+      attr: {
+        type: "text",
+        placeholder: "z. B. Stück",
+        "aria-label": "Einheit, optional",
+      },
+    });
+
+    const addButton = form.createEl("button", {
+      text: "Hinzufügen",
+    });
+
+    const addManualItem = (): void => {
+      const name = nameInput.value.trim();
+      const rawAmount = amountInput.value.trim();
+      const amount = rawAmount ? Number(rawAmount) : undefined;
+
+      if (!name) {
+        this.plugin.notice("Bitte gib einen Artikelnamen ein.");
+        return;
+      }
+
+      if (
+        amount !== undefined &&
+        (!Number.isFinite(amount) || amount < 0)
+      ) {
+        this.plugin.notice(
+          "Die Menge muss eine Zahl größer oder gleich null sein.",
+        );
+        return;
+      }
+
+      void this.plugin
+        .addManualShoppingItem(name, amount, unitInput.value)
+        .then(() => this.refreshShoppingList());
+    };
+
+    addButton.addEventListener("click", addManualItem);
+    nameInput.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+
+      event.preventDefault();
+      addManualItem();
+    });
+
+    if (manualItems.length === 0) {
+      return;
+    }
+
+    const list = section.createDiv("cookbook-shopping-manual-items");
+    list.createEl("strong", { text: "Manuelle Positionen" });
+
+    for (const item of manualItems) {
+      const row = list.createDiv("cookbook-shopping-manual-item");
+
+      row.createEl("strong", { text: item.name });
+
+      const quantity = formatManualShoppingItemAmount(item);
+
+      if (quantity) {
+        row.createSpan({ text: quantity });
+      }
+
+      const removeButton = row.createEl("button", {
+        cls: "clickable-icon",
+        attr: {
+          "aria-label": `${item.name} aus der Einkaufsliste entfernen`,
+          title: "Aus Einkaufsliste entfernen",
+        },
+      });
+
+      setIcon(removeButton, "x");
+      removeButton.addEventListener("click", () => {
+        void this.plugin
+          .removeManualShoppingItem(item.id)
+          .then(() => this.refreshShoppingList());
+      });
+    }
   }
 
   private renderCookingMode(recipe: Recipe, page: number): void {
@@ -539,7 +1328,14 @@ export class CookbookView extends ItemView {
     }
 
     const selectedPeople = this.getSelectedPeople();
-    const plan = buildRecipePlan(recipe, this.library, selectedPeople);
+    const packageStoreIds = this.getRecipePackageStoreIds(
+      recipe,
+      selectedPeople,
+    );
+
+    const plan = buildRecipePlan(recipe, this.library, selectedPeople, {
+      ...this.getRecipePlanOptions(recipe, packageStoreIds),
+    });
 
     const pages = buildCookingPages(plan);
     const safePage = Math.max(0, Math.min(page, pages.length - 1));
@@ -556,10 +1352,103 @@ export class CookbookView extends ItemView {
     let pointerStartX = 0;
     let pointerStartY = 0;
     let isHorizontalSwipe: boolean | null = null;
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    pageEl.addEventListener(
+      "touchstart",
+      (event) => {
+        if (isCookingPageInteractiveTarget(event.target)) {
+          return;
+        }
+
+        if (!this.plugin.settings.preventSidePaneSwipes) {
+          return;
+        }
+
+        const touch = event.touches[0];
+
+        if (!touch) {
+          return;
+        }
+
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        event.stopPropagation();
+      },
+      { capture: true, passive: true },
+    );
+
+    pageEl.addEventListener(
+      "touchmove",
+      (event) => {
+        if (isCookingPageInteractiveTarget(event.target)) {
+          return;
+        }
+
+        if (!this.plugin.settings.preventSidePaneSwipes) {
+          return;
+        }
+
+        const touch = event.touches[0];
+
+        if (!touch) {
+          return;
+        }
+
+        const deltaX = touch.clientX - touchStartX;
+        const deltaY = touch.clientY - touchStartY;
+        const isHorizontal =
+          Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY);
+
+        if (isHorizontal && event.cancelable) {
+          event.preventDefault();
+        }
+
+        event.stopPropagation();
+      },
+      { capture: true, passive: false },
+    );
+
+    pageEl.addEventListener(
+      "touchend",
+      (event) => {
+        if (isCookingPageInteractiveTarget(event.target)) {
+          return;
+        }
+
+        if (!this.plugin.settings.preventSidePaneSwipes) {
+          return;
+        }
+
+        event.stopPropagation();
+      },
+      { capture: true, passive: true },
+    );
+
+    pageEl.addEventListener(
+      "touchcancel",
+      (event) => {
+        if (isCookingPageInteractiveTarget(event.target)) {
+          return;
+        }
+
+        if (!this.plugin.settings.preventSidePaneSwipes) {
+          return;
+        }
+
+        event.stopPropagation();
+      },
+      { capture: true, passive: true },
+    );
 
     pageEl.addEventListener(
       "pointerdown",
       (event) => {
+        if (isCookingPageInteractiveTarget(event.target)) {
+          return;
+        }
+
         if (event.pointerType === "mouse" && event.button !== 0) {
           return;
         }
@@ -575,6 +1464,7 @@ export class CookbookView extends ItemView {
           event.stopPropagation();
         }
       },
+	  { capture: true },
     );
 	
     pageEl.addEventListener(
@@ -606,7 +1496,7 @@ export class CookbookView extends ItemView {
           }
         }
       },
-      { passive: false },
+      { capture: true, passive: false },
     );
 
     pageEl.addEventListener(
@@ -644,13 +1534,22 @@ export class CookbookView extends ItemView {
           this.goToCookingPage(recipe, safePage - 1, pages.length);
         }
       },
+	  { capture: true },
     );
 	
-    pageEl.addEventListener("pointercancel", () => {
-      pointerId = null;
-      isHorizontalSwipe = null;
-      pageEl.removeClass("is-swiping-horizontally");
-    });
+    pageEl.addEventListener(
+      "pointercancel",
+      (event) => {
+        pointerId = null;
+        isHorizontalSwipe = null;
+        pageEl.removeClass("is-swiping-horizontally");
+
+        if (this.plugin.settings.preventSidePaneSwipes) {
+          event.stopPropagation();
+        }
+      },
+      { capture: true },
+    );
 	
     if (this.plugin.settings.preventSidePaneSwipes) {
       pageEl.addClass("is-side-pane-swipe-guarded");
@@ -729,12 +1628,19 @@ export class CookbookView extends ItemView {
       }
 
       if (currentPage.step.timerMinutes) {
-        pageEl.createDiv({
-          cls: "cookbook-timer-hint",
-          text: `Timer: ${currentPage.step.timerMinutes} minutes`,
-        });
+        this.renderCookingTimerControls(
+          pageEl,
+          this.getCookingTimerId(recipe, currentPage.stepIndex),
+          `${recipe.title}: ${
+            currentPage.step.title ??
+            `Schritt ${currentPage.stepIndex + 1}`
+          }`,
+          currentPage.step.timerMinutes,
+        );
       }
     }
+	
+	this.renderActiveCookingTimers(cooking, recipe);
 
     const footer = cooking.createDiv("cookbook-cooking-footer");
 
@@ -772,6 +1678,232 @@ export class CookbookView extends ItemView {
   }
   
   /**
+   * Rendert die Bedienung für den Timer des aktuellen Kochschritts.
+   * Der Controller bleibt dabei außerhalb der View bestehen, sodass der
+   * Timer beim Blättern weiterläuft.
+   */
+  private renderCookingTimerControls(
+    parent: HTMLElement,
+    timerId: string,
+    label: string,
+    durationMinutes: number,
+  ): void {
+    const timer = parent.createDiv("cookbook-timer");
+    timer.createEl("strong", { text: "Koch-Timer" });
+
+    const status = timer.createDiv("cookbook-timer-status");
+    const actions = timer.createDiv("cookbook-timer-actions");
+
+    const primaryButton = actions.createEl("button");
+    const addMinuteButton = actions.createEl("button", {
+      text: "+1 Min.",
+    });
+    const cancelButton = actions.createEl("button", {
+      text: "Abbrechen",
+    });
+
+    const update = (): void => {
+      const currentTimer = this.plugin.cookingTimers.getTimer(timerId);
+      this.updateCookingTimerControls(
+        timer,
+        status,
+        primaryButton,
+        addMinuteButton,
+        cancelButton,
+        currentTimer,
+        durationMinutes,
+      );
+    };
+
+    primaryButton.addEventListener("click", () => {
+      const currentTimer = this.plugin.cookingTimers.getTimer(timerId);
+
+      if (currentTimer?.status === "running") {
+        this.plugin.cookingTimers.pause(timerId);
+        return;
+      }
+
+      if (currentTimer?.status === "paused") {
+        this.plugin.cookingTimers.resume(timerId);
+        return;
+      }
+
+      this.plugin.cookingTimers.start(
+        timerId,
+        label,
+        durationMinutes,
+      );
+    });
+
+    addMinuteButton.addEventListener("click", () => {
+      this.plugin.cookingTimers.addSeconds(timerId, 60);
+    });
+
+    cancelButton.addEventListener("click", () => {
+      this.plugin.cookingTimers.cancel(timerId);
+    });
+
+    this.timerUnsubscribers.push(
+      this.plugin.cookingTimers.subscribe(update),
+    );
+
+    update();
+  }
+
+  /**
+   * Zeigt parallel laufende Timer auch auf anderen Rezeptseiten an. Fertige
+   * Timer erscheinen hier nicht mehr; im ursprünglichen Rezeptschritt bleibt
+   * ihr Status jedoch sichtbar und kann neu gestartet werden.
+   */
+  private renderActiveCookingTimers(
+    parent: HTMLElement,
+    recipe: Recipe,
+  ): void {
+    const recipeTimerPrefix = `recipe:${recipe.id}:`;
+    const panel = parent.createDiv("cookbook-active-timers");
+    panel.createEl("strong", { text: "Aktive Timer" });
+
+    const list = panel.createDiv("cookbook-active-timer-list");
+
+    const update = (): void => {
+      const activeTimers = this.plugin.cookingTimers
+        .getTimers()
+        .filter(
+          (timer) =>
+            timer.id.startsWith(recipeTimerPrefix) &&
+            timer.status !== "finished",
+        );
+
+      panel.toggleClass("is-empty", activeTimers.length === 0);
+      list.empty();
+
+      if (activeTimers.length === 0) {
+        return;
+      }
+
+      for (const timer of activeTimers) {
+        const row = list.createDiv("cookbook-active-timer");
+
+        row.createSpan({
+          text: timer.label,
+        });
+
+        row.createEl("strong", {
+          text: formatTimerDuration(timer.remainingSeconds),
+        });
+
+        const actionButton = row.createEl("button", {
+          text:
+            timer.status === "running"
+              ? "Pausieren"
+              : "Fortsetzen",
+        });
+
+        actionButton.addEventListener("click", () => {
+          if (timer.status === "running") {
+            this.plugin.cookingTimers.pause(timer.id);
+          } else {
+            this.plugin.cookingTimers.resume(timer.id);
+          }
+        });
+
+        const addMinuteButton = row.createEl("button", {
+          text: "+1",
+          attr: {
+            "aria-label": `${timer.label}: eine Minute hinzufügen`,
+            title: "Eine Minute hinzufügen",
+          },
+        });
+
+        addMinuteButton.addEventListener("click", () => {
+          this.plugin.cookingTimers.addSeconds(timer.id, 60);
+        });
+      }
+    };
+
+    this.timerUnsubscribers.push(
+      this.plugin.cookingTimers.subscribe(update),
+    );
+
+    update();
+  }
+
+  private updateCookingTimerControls(
+    container: HTMLElement,
+    status: HTMLElement,
+    primaryButton: HTMLButtonElement,
+    addMinuteButton: HTMLButtonElement,
+    cancelButton: HTMLButtonElement,
+    timer: CookingTimerSnapshot | undefined,
+    durationMinutes: number,
+  ): void {
+    container.removeClasses([
+      "is-running",
+      "is-paused",
+      "is-finished",
+    ]);
+
+    if (!timer) {
+      status.setText(
+        `Bereit: ${formatTimerDuration(
+          Math.round(durationMinutes * 60),
+        )}`,
+      );
+      primaryButton.setText(
+        `Timer starten · ${formatTimerDuration(
+          Math.round(durationMinutes * 60),
+        )}`,
+      );
+      addMinuteButton.disabled = true;
+      cancelButton.disabled = true;
+      return;
+    }
+
+    if (timer.status === "running") {
+      container.addClass("is-running");
+      status.setText(
+        `Läuft: noch ${formatTimerDuration(timer.remainingSeconds)}`,
+      );
+      primaryButton.setText("Pausieren");
+      addMinuteButton.disabled = false;
+      cancelButton.disabled = false;
+      return;
+    }
+
+    if (timer.status === "paused") {
+      container.addClass("is-paused");
+      status.setText(
+        `Pausiert: noch ${formatTimerDuration(timer.remainingSeconds)}`,
+      );
+      primaryButton.setText("Fortsetzen");
+      addMinuteButton.disabled = false;
+      cancelButton.disabled = false;
+      return;
+    }
+
+    container.addClass("is-finished");
+    status.setText("Timer abgelaufen.");
+    primaryButton.setText("Erneut starten");
+    addMinuteButton.disabled = true;
+    cancelButton.disabled = false;
+  }
+
+  private getCookingTimerId(
+    recipe: Recipe,
+    stepIndex: number,
+  ): string {
+    return `recipe:${recipe.id}:step:${stepIndex}`;
+  }
+
+  private disposeTimerSubscriptions(): void {
+    for (const unsubscribe of this.timerUnsubscribers) {
+      unsubscribe();
+    }
+
+    this.timerUnsubscribers = [];
+  }
+  
+  /**
    * Converts a vault-relative attachment path into a URL that the embedded
    * browser can load. External image URLs remain unchanged.
    */
@@ -796,6 +1928,102 @@ export class CookbookView extends ItemView {
 
     this.render();
   }
+  
+  /**
+   * Ermittelt die Märkte, die für genau dieses Rezept gemäß der aktuellen
+   * Ortsauswahl und Marktstrategie relevant sind. Diese Märkte bestimmen,
+   * welche marktspezifischen Packungsgrößen beim Skalieren gelten.
+   */
+  private getRecipePackageStoreIds(
+    recipe: Recipe,
+    selectedPeople: CookbookPerson[],
+  ): string[] {
+    if (!this.library) {
+      return [];
+    }
+
+    const selectedLocationId = this.plugin.settings.shoppingLocationId;
+    const markets = selectedLocationId
+      ? this.plugin.getKnownMarkets(selectedLocationId)
+      : this.library.markets ?? [];
+
+    const recipeIds = new Set(this.plugin.getShoppingRecipeIds());
+    const relevantRecipes = recipeIds.has(recipe.id)
+      ? this.recipes.filter((entry) => recipeIds.has(entry.id))
+      : [recipe];
+
+    const allItems = buildShoppingList(
+      relevantRecipes,
+      this.library,
+      selectedPeople,
+    );
+	
+    const excludedIngredientIds = new Set(
+      this.plugin.getShoppingExcludedIngredientIds(),
+    );
+
+    return createShoppingStorePlan(
+      allItems.filter(
+        (item) => !excludedIngredientIds.has(item.ingredient.id),
+      ),
+      this.library,
+      this.plugin.settings.shoppingStoreMode,
+      this.plugin.settings.favoriteStoreId,
+      markets.map((market) => market.id),
+    ).marketIds;
+  }
+  
+  private getRecipePlanOptions(
+    recipe: Recipe,
+    packageStoreIds: string[],
+  ): {
+    packageStoreIds: string[];
+    manualScaleFactor?: number;
+  } {
+    return {
+      packageStoreIds,
+      manualScaleFactor: this.plugin.getRecipeScaleOverride(recipe.id)
+        ?.scaleFactor,
+    };
+  }
+
+  private getRecipeScaleDescription(
+    recipe: Recipe,
+    selectedPeople: CookbookPerson[],
+    packageStoreIds: string[],
+  ): string {
+    if (!this.library) {
+      return "";
+    }
+
+    const override = this.plugin.getRecipeScaleOverride(recipe.id);
+
+    if (override) {
+      const ingredient =
+        this.library.ingredients.find(
+          (entry) => entry.id === override.ingredientId,
+        )?.name ?? override.ingredientId;
+
+      return `Manuell skaliert über ${ingredient}: ${formatNumber(
+        override.targetAmount,
+      )} ${override.unit}`;
+    }
+
+    const plan = buildRecipePlan(
+      recipe,
+      this.library,
+      selectedPeople,
+      this.getRecipePlanOptions(recipe, packageStoreIds),
+    );
+
+    if (plan.packageAnchor) {
+      return `Automatisch skaliert über ${plan.packageAnchor.ingredient.name}: ${formatNumber(
+        plan.packageAnchor.chosenAmount,
+      )} ${plan.packageAnchor.ingredient.defaultUnit}`;
+    }
+
+    return `Skalierung für ${formatNumber(plan.eaterTotal || recipe.baseEaters)} Portionseinheiten`;
+  }
 
   private getSelectedPeople(): CookbookPerson[] {
     return (
@@ -803,6 +2031,88 @@ export class CookbookView extends ItemView {
         this.selectedPersonIds.has(person.id),
       ) ?? []
     );
+  }
+  
+  /**
+   * Stellt die gespeicherte Gästeauswahl wieder her und entfernt dabei IDs,
+   * die inzwischen nicht mehr in der Bibliothek existieren.
+   */
+  private restoreSelectedPeople(): void {
+    if (!this.library) {
+      return;
+    }
+
+    const knownPersonIds = new Set(
+      this.library.people.map((person) => person.id),
+    );
+
+    const activeGuestIds = this.plugin
+      .getActiveGuestIds()
+      .filter((personId) => knownPersonIds.has(personId));
+
+    this.selectedPersonIds = new Set(activeGuestIds);
+
+    if (
+      activeGuestIds.length !== this.plugin.getActiveGuestIds().length
+    ) {
+      void this.plugin.setActiveGuestIds(activeGuestIds);
+    }
+  }
+
+  private async toggleSelectedPerson(personId: string): Promise<void> {
+    if (this.selectedPersonIds.has(personId)) {
+      this.selectedPersonIds.delete(personId);
+    } else {
+      this.selectedPersonIds.add(personId);
+    }
+
+    await this.plugin.setActiveGuestIds(this.selectedPersonIds);
+
+    if (this.screen.kind === "guests") {
+      this.refreshGuestList();
+      return;
+    }
+
+    if (this.screen.kind === "browser") {
+      this.renderBrowserRecipeGrid();
+      return;
+    }
+
+    if (this.screen.kind === "shopping") {
+      this.refreshShoppingList();
+      return;
+    }
+
+    this.render();
+  }
+  
+  private async requestShoppingPlanningReset(): Promise<void> {
+    if (!this.plugin.settings.confirmShoppingPlanningReset) {
+      await this.resetShoppingPlanning();
+      return;
+    }
+
+    new ResetShoppingPlanningModal(
+      this.app,
+      async (dontAskAgain) => {
+        if (dontAskAgain) {
+          this.plugin.settings.confirmShoppingPlanningReset = false;
+          await this.plugin.saveSettings();
+        }
+
+        await this.resetShoppingPlanning();
+      },
+    ).open();
+  }
+
+  private async resetShoppingPlanning(): Promise<void> {
+    await this.plugin.resetShoppingPlanning();
+    this.selectedPersonIds.clear();
+    this.selectedCategoryId = null;
+    this.screen = { kind: "browser" };
+
+    this.plugin.notice("Die Einkaufsplanung wurde zurückgesetzt.");
+    this.render();
   }
   
   /**
@@ -1001,6 +2311,20 @@ function buildCookingPages(plan: RecipePlan) {
   return pages;
 }
 
+function isCookingPageInteractiveTarget(
+  target: EventTarget | null,
+): boolean {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest(
+      "button, input, select, textarea, a, [role='button'], [contenteditable='true']",
+    ),
+  );
+}
+
 function renderIngredientGrid(
   parent: HTMLElement,
   ingredients: ScaledIngredient[],
@@ -1078,4 +2402,69 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 1,
   }).format(value);
+}
+
+function formatTimerDuration(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.ceil(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatShoppingEmail(
+  recipes: Array<{ title: string; scaleDescription: string }>,
+  items: Array<{
+    ingredient: { name: string };
+    amount: number;
+    unit: string;
+    notes: string[];
+  }>,
+  manualItems: ManualShoppingItem[],
+  marketNames: string[],
+): string {
+  const lines = [
+    "Einkaufsliste",
+    "",
+    "Rezepte:",
+    ...recipes.map(
+      (recipe) => `- ${recipe.title} (${recipe.scaleDescription})`,
+    ),
+    "",
+  ];
+
+  if (marketNames.length > 0) {
+    lines.push(`Empfohlene Märkte: ${marketNames.join(", ")}`, "");
+  }
+
+  lines.push(
+    "Zutaten:",
+    ...items.map((item) => {
+      const note = item.notes.length > 0 ? ` (${item.notes.join("; ")})` : "";
+      return `- ${formatNumber(item.amount)} ${item.unit} ${item.ingredient.name}${note}`;
+    }),
+  );
+  
+  if (manualItems.length > 0) {
+    lines.push(
+      "",
+      "Manuell hinzugefügt:",
+      ...manualItems.map((item) => {
+        const amount = formatManualShoppingItemAmount(item);
+        return `- ${amount ? `${amount} ` : ""}${item.name}`;
+      }),
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function formatManualShoppingItemAmount(
+  item: ManualShoppingItem,
+): string {
+  if (item.amount === undefined) {
+    return item.unit ?? "";
+  }
+
+  return `${formatNumber(item.amount)}${item.unit ? ` ${item.unit}` : ""}`;
 }

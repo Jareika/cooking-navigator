@@ -1,5 +1,6 @@
 import { Notice, Plugin, WorkspaceLeaf } from "obsidian";
 import { CookbookDatabase } from "./database";
+import { CookingTimerController } from "./cooking-timer";
 import { CookbookSettingTab } from "./settings";
 import { GuestSettingsModal } from "./guest-settings-modal";
 import { resolveImageUrl } from "./image-utils";
@@ -12,9 +13,14 @@ import type {
   CookbookSettings,
   CookbookPerson,
   GuestButtonSettings,
+  ManualShoppingItem,
   RecipeCategory,
   RecipeDocument,
+  RecipeScaleOverride,
+  ShoppingLocation,
+  StoreDefinition,
 } from "./types";
+import { IngredientManagementModal } from "./ingredient-management-modal";
 
 interface ObsidianSettingsView {
   open(): void;
@@ -29,7 +35,9 @@ const DEFAULT_SETTINGS: CookbookSettings = {
   databaseFolder: "Cookbook",
   defaultRecipeFile: "recipes-main.json",
   enableJsonBackups: true,
+  jsonBackupCount: 2,
   backupFolder: "Cookbook/Backups",
+  confirmShoppingPlanningReset: true,
   showPackageSuggestions: true,
   showIngredientAllergens: true,
   preventSidePaneSwipes: true,
@@ -37,6 +45,17 @@ const DEFAULT_SETTINGS: CookbookSettings = {
   categoryButtons: [],
   guestButtons: [],
   allRecipesButtonImagePath: undefined,
+  shoppingRecipeIds: [],
+  activeGuestIds: [],
+  manualRecipeScaleOverrides: {},
+  shoppingStoreMode: "favorite-first",
+  shoppingLocationId: undefined,
+  favoriteStoreId: undefined,
+  shoppingListEmailRecipient: undefined,
+  shoppingExcludedIngredientIds: [],
+  manualShoppingItems: [],
+  timerAlarmSoundPath: undefined,
+  timerAlarmVolume: 0.8,
 };
 
 const EXAMPLE_LIBRARY: CookbookLibrary = {
@@ -186,9 +205,12 @@ const EXAMPLE_RECIPES: RecipeDocument = {
 export default class CookbookPlugin extends Plugin {
   declare settings: CookbookSettings;
   database!: CookbookDatabase;
+  cookingTimers!: CookingTimerController;
   private settingsTab!: CookbookSettingTab;
   private knownCategories: RecipeCategory[] = [];
   private knownPeople: CookbookPerson[] = [];
+  private knownMarkets: StoreDefinition[] = [];
+  private knownShoppingLocations: ShoppingLocation[] = [];
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -198,6 +220,18 @@ export default class CookbookPlugin extends Plugin {
       this.app.vault,
       () => this.settings,
     );
+	
+    this.cookingTimers = new CookingTimerController({
+      getAlarmSoundUrl: () => {
+        const soundPath = this.settings.timerAlarmSoundPath;
+
+        return soundPath
+          ? this.resolveVaultImageUrl(soundPath)
+          : undefined;
+      },
+      getAlarmVolume: () => this.settings.timerAlarmVolume,
+      notice: (message) => this.notice(message),
+    });
 
     this.registerView(
       COOKBOOK_VIEW_TYPE,
@@ -231,7 +265,8 @@ export default class CookbookPlugin extends Plugin {
   }
   
   onunload(): void {
-    document.body.removeClass("cookbook-focus-mode");
+    this.cookingTimers?.dispose();
+	document.body.removeClass("cookbook-focus-mode");
   }
 
   async loadSettings(): Promise<void> {
@@ -279,7 +314,9 @@ export default class CookbookPlugin extends Plugin {
   async loadLibrary(): Promise<CookbookLibrary> {
     const library = await this.database.loadLibrary();
     await this.syncCategoryButtons(library.categories);
-	await this.syncGuestButtons(library.people);
+    await this.syncGuestButtons(library.people);
+    this.knownMarkets = library.markets ?? [];
+	this.knownShoppingLocations = library.shoppingLocations ?? [];
     return library;
   }
 
@@ -287,12 +324,172 @@ export default class CookbookPlugin extends Plugin {
     try {
       const library = await this.database.loadLibrary();
       await this.syncCategoryButtons(library.categories);
-	  await this.syncGuestButtons(library.people);
+      await this.syncGuestButtons(library.people);
+      this.knownMarkets = library.markets ?? [];
+	  this.knownShoppingLocations = library.shoppingLocations ?? [];
     } catch {
       this.knownCategories = [];
-	  this.knownPeople = [];
+      this.knownPeople = [];
+      this.knownMarkets = [];
+	  this.knownShoppingLocations = [];
       this.settingsTab?.update();
     }
+  }
+  
+  getKnownShoppingLocations(): ShoppingLocation[] {
+    return this.knownShoppingLocations;
+  }
+
+  getKnownMarkets(locationId?: string): StoreDefinition[] {
+    if (!locationId) {
+      return this.knownMarkets;
+    }
+
+    return this.knownMarkets.filter(
+      (market) => market.locationId === locationId,
+    );
+  }
+
+  getShoppingRecipeIds(): string[] {
+    return [...new Set(this.settings.shoppingRecipeIds)];
+  }
+
+  isRecipeInShoppingList(recipeId: string): boolean {
+    return this.settings.shoppingRecipeIds.includes(recipeId);
+  }
+
+  async toggleRecipeInShoppingList(recipeId: string): Promise<boolean> {
+    const recipeIds = this.getShoppingRecipeIds();
+    const currentIndex = recipeIds.indexOf(recipeId);
+
+    if (currentIndex >= 0) {
+      recipeIds.splice(currentIndex, 1);
+    } else {
+      recipeIds.push(recipeId);
+    }
+
+    this.settings.shoppingRecipeIds = recipeIds;
+    await this.saveSettings();
+
+    return recipeIds.includes(recipeId);
+  }
+  
+  getRecipeScaleOverride(
+    recipeId: string,
+  ): RecipeScaleOverride | undefined {
+    return this.settings.manualRecipeScaleOverrides[recipeId];
+  }
+
+  async setRecipeScaleOverride(
+    recipeId: string,
+    override: RecipeScaleOverride,
+  ): Promise<void> {
+    this.settings.manualRecipeScaleOverrides[recipeId] = override;
+    await this.saveSettings();
+  }
+
+  async clearRecipeScaleOverride(recipeId: string): Promise<void> {
+    delete this.settings.manualRecipeScaleOverrides[recipeId];
+    await this.saveSettings();
+  }
+
+  getActiveGuestIds(): string[] {
+    return [...new Set(this.settings.activeGuestIds)];
+  }
+
+  async setActiveGuestIds(guestIds: Iterable<string>): Promise<void> {
+    this.settings.activeGuestIds = [...new Set(guestIds)];
+    await this.saveSettings();
+  }
+
+  /**
+   * Setzt den temporären Einkaufs- und Planungszustand zurück.
+   * Persönliche Einstellungen wie Marktstrategie und Favoritenmarkt bleiben
+   * bewusst erhalten.
+   */
+  async resetShoppingPlanning(): Promise<void> {
+    this.settings.shoppingRecipeIds = [];
+    this.settings.shoppingExcludedIngredientIds = [];
+    this.settings.activeGuestIds = [];
+    this.settings.manualRecipeScaleOverrides = {};
+    this.settings.shoppingLocationId = undefined;
+	this.settings.manualShoppingItems = [];
+
+    await this.saveSettings();
+  }
+
+  getShoppingExcludedIngredientIds(): string[] {
+    return [...new Set(this.settings.shoppingExcludedIngredientIds)];
+  }
+
+  isShoppingIngredientExcluded(ingredientId: string): boolean {
+    return this.settings.shoppingExcludedIngredientIds.includes(ingredientId);
+  }
+
+  async setShoppingIngredientExcluded(
+    ingredientId: string,
+    excluded: boolean,
+  ): Promise<void> {
+    const ingredientIds = new Set(this.getShoppingExcludedIngredientIds());
+
+    if (excluded) {
+      ingredientIds.add(ingredientId);
+    } else {
+      ingredientIds.delete(ingredientId);
+    }
+
+    this.settings.shoppingExcludedIngredientIds = [...ingredientIds];
+    await this.saveSettings();
+  }
+  
+  getManualShoppingItems(): ManualShoppingItem[] {
+    return this.settings.manualShoppingItems
+      .filter((item) => item.name.trim().length > 0)
+      .map((item) => ({ ...item }));
+  }
+
+  async addManualShoppingItem(
+    name: string,
+    amount?: number,
+    unit?: string,
+  ): Promise<void> {
+    this.settings.manualShoppingItems.push({
+      id: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: name.trim(),
+      amount,
+      unit: unit?.trim() || undefined,
+    });
+
+    await this.saveSettings();
+  }
+
+  async removeManualShoppingItem(itemId: string): Promise<void> {
+    this.settings.manualShoppingItems =
+      this.settings.manualShoppingItems.filter(
+        (item) => item.id !== itemId,
+      );
+
+    await this.saveSettings();
+  }
+  
+  async setShoppingLocation(locationId: string | undefined): Promise<void> {
+    this.settings.shoppingLocationId = locationId;
+
+    if (
+      this.settings.favoriteStoreId &&
+      locationId &&
+      !this.getKnownMarkets(locationId).some(
+        (market) => market.id === this.settings.favoriteStoreId,
+      )
+    ) {
+      this.settings.favoriteStoreId = undefined;
+    }
+
+    await this.saveSettings();
+  }
+
+  openIngredientManagement(onChanged: () => void): void {
+    new IngredientManagementModal(this.app, this, onChanged).open();
   }
 
   getOrderedCategories(
@@ -367,6 +564,18 @@ export default class CookbookPlugin extends Plugin {
   async saveLibrary(library: CookbookLibrary): Promise<void> {
     await this.database.saveLibrary(library);
     await this.syncGuestButtons(library.people);
+    this.knownMarkets = library.markets ?? [];
+    this.knownShoppingLocations = library.shoppingLocations ?? [];
+
+    if (
+      this.settings.shoppingLocationId &&
+      !this.knownShoppingLocations.some(
+        (location) => location.id === this.settings.shoppingLocationId,
+      )
+    ) {
+      this.settings.shoppingLocationId = undefined;
+      await this.saveSettings();
+    }
   }
 
   async setGuestButtonImage(

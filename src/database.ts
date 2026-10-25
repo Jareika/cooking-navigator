@@ -8,7 +8,8 @@ import type {
 
 const LIBRARY_FILE = "cookbook-library.json";
 const RECIPE_FILE_PREFIX = "recipes-";
-const BACKUP_SLOT_COUNT = 2;
+const MIN_BACKUP_SLOT_COUNT = 2;
+const MAX_BACKUP_SLOT_COUNT = 5;
 
 export class CookbookDatabase {
   constructor(
@@ -114,6 +115,18 @@ export class CookbookDatabase {
     await this.backupCurrentFile(path);
 
     await this.vault.adapter.write(path, nextContent);
+
+    /**
+     * Ab drei Sicherungen wird zusätzlich der gerade erfolgreich geschriebene
+     * Zustand gesichert. Bei zwei Slots bleibt das bisherige Verhalten:
+     * Es existieren ausschließlich vorherige Dateistände als Sicherung.
+     */
+    if (
+      this.getSettings().enableJsonBackups &&
+      this.backupSlotCount >= 3
+    ) {
+      await this.backupContent(path, nextContent);
+    }
   }
 
   private async readJsonFile(path: string): Promise<string | null> {
@@ -146,10 +159,33 @@ export class CookbookDatabase {
 
     JSON.parse(currentContent);
 
+    await this.backupContent(originalPath, currentContent);
+  }
+
+  /**
+   * Speichert einen JSON-Stand in einem rotierenden Backup-Slot.
+   *
+   * Wenn der neueste gültige Slot bereits exakt denselben Inhalt enthält,
+   * wird kein Duplikat angelegt. Das verhindert insbesondere bei drei oder
+   * mehr Slots doppelte Einträge: Der vorherige aktuelle Stand wurde bereits
+   * nach seinem letzten Speichervorgang gesichert.
+   */
+  private async backupContent(
+    originalPath: string,
+    content: string,
+  ): Promise<void> {
+    JSON.parse(content);
+
     await this.ensureBackupFolder();
 
+    const newestBackup = await this.getNewestValidBackup(originalPath);
+
+    if (newestBackup?.content === content) {
+      return;
+    }
+
     const targetPath = await this.getOldestBackupPath(originalPath);
-    await adapter.write(targetPath, currentContent);
+    await this.vault.adapter.write(targetPath, content);
   }
 
   private async restoreNewestBackup(
@@ -190,11 +226,32 @@ export class CookbookDatabase {
     }
 
     return Array.from(
-      { length: BACKUP_SLOT_COUNT },
+      { length: this.backupSlotCount },
       (_, index) =>
         normalizePath(
           `${this.backupFolder}/${fileName}.backup-${index + 1}.json`,
         ),
+    );
+  }
+  
+  /**
+   * Settings können auch durch alte oder manuell bearbeitete Daten ungültige
+   * Werte enthalten. Die Datenbank erzwingt daher unabhängig vom UI immer
+   * den erlaubten Bereich von zwei bis fünf Sicherungen.
+   */
+  private get backupSlotCount(): number {
+    const configuredCount = this.getSettings().jsonBackupCount;
+
+    if (!Number.isFinite(configuredCount)) {
+      return MIN_BACKUP_SLOT_COUNT;
+    }
+
+    return Math.max(
+      MIN_BACKUP_SLOT_COUNT,
+      Math.min(
+        MAX_BACKUP_SLOT_COUNT,
+        Math.round(configuredCount),
+      ),
     );
   }
 

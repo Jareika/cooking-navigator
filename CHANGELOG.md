@@ -1,5 +1,64 @@
 ## [Unreleased]
 
+- Added an independent cooking-timer controller with support for multiple parallel recipe timers.
+- Recipe steps with `timerMinutes` now provide start, pause, resume, add-one-minute, cancel, and restart controls.
+- Added a persistent-on-page-change active-timer overview in cooking mode.
+- Cooking timers calculate their remaining duration from an absolute end time, avoiding countdown drift after rendering delays or page changes.
+- Added optional vault-based timer alarm sounds and a configurable alarm volume.
+- Added an Obsidian notice when a cooking timer expires.
+- Arranged category buttons horizontally with wrapping in the mobile recipe browser.
+- Allowed long recipe titles to wrap instead of overflowing their cards on mobile devices.
+- Cookbook focus mode now hides Obsidian's bottom mobile navigation bar.
+- Reduced ingredient-management modal flickering by keeping the modal shell stable and refreshing only the affected management section.
+- Expanding, saving, deleting, and adding ingredients now updates the ingredient area in place while preserving modal scroll position.
+- Reduced Cookbook view flickering by updating browser filters, guest cards, and shopping-list content in place instead of rebuilding the full view.
+- Shopping-list changes such as selecting a location, removing recipes, marking ingredients as available at home, and editing manual items now keep the surrounding Cookbook screen and its scroll position stable.
+- Added a JSON-backup-count slider with two to five rotating backup slots.
+- With three or more JSON backups, the successfully saved current file state is also retained as a backup.
+- Avoided duplicate JSON backup snapshots when the latest backup already contains the same file state.
+- Shopping-list emails now include the active scaling reminder for every recipe, including its package-anchor ingredient or manual scaling source.
+- Added persistent manual shopping-list positions with optional amount and unit.
+- Manual shopping-list positions are included in the generated shopping-list email.
+- Preserved the Cookbook view scroll position while the view is rebuilt after list changes.
+- Replaced the native browser confirmation for resetting shopping planning with an Obsidian modal.
+- Added a “do not ask again” option for the shopping-planning reset confirmation.
+- Added persistent shopping-planning state. Selected guests, manual recipe-scale overrides, selected shopping location, and shopping-list recipes now survive an Obsidian restart.
+- Manual recipe-scale overrides now remain active until explicitly reset.
+- Shopping-list scaling hints remain accurate after restarting Obsidian because their guest selection and manual scaling source are restored.
+- Added an action-bar button to reset the current shopping planning.
+- Resetting shopping planning clears shopping-list recipes, guests, manual recipe-scale overrides, ingredients marked as already available at home, and the selected shopping location.
+- Fixed TypeScript narrowing for the recipe-scale action in cooking mode.
+- Added a recipe-scale modal in cooking mode.- Shopping-list recipes now show the active scaling source, including the automatic package anchor or a manual override.
+- Cooking a recipe that is part of the shopping list now uses the market selection of the full current shopping list.
+- Shopping-list ingredients can be marked as already available at home and restored later without removing their recipes.
+- Added supermarket-specific package-size overrides. Recipe scaling now respects the supermarkets selected by the current shopping location and shopping strategy.
+- Hardened cooking-mode swipe handling on touch devices so horizontal recipe navigation no longer opens Obsidian side panes.
+- Cookbook focus mode now also hides the workspace tab bar on tablets.
+- Moved shopping-location management into the collapsible supermarket section for a more compact ingredient-management modal.
+- Ingredient cards can now be expanded and collapsed by clicking their header; the separate expand button was removed.
+- Preserved the ingredient-management modal scroll position reliably while expanding ingredients and after saving edits.
+- Added a direct ingredient-management button to the cookbook action bar.
+- Collapsed the supermarket-management section by default in the ingredient modal.
+- Supermarket-management expansion state is retained while editing ingredients.
+- Preserved the ingredient-modal scroll position when saving, expanding, or collapsing content.
+- Added shopping locations, allowing supermarkets to be assigned to places such as Haselünne, Herzlake, or Meppen.
+- Added shopping-location selection in the shopping-list view.
+- Shopping-store recommendations now only consider supermarkets at the selected shopping location.
+- Added a management modal for ingredients, shopping locations, and supermarkets.
+- Ingredients can now be created, edited, and deleted when unused by recipes.
+- Ingredient management supports package sizes, resource priority, units, and supermarket availability.
+- Supermarkets can now be created per shopping location and safely removed from ingredient availability assignments.
+- Fixed TypeScript inference for declarative settings dropdown options.
+- Fixed resolved ingredient-ID collection for recipe steps in the shopping-list feature.
+- Added a persistent shopping list for recipes.
+- Recipe cards now include a compact shopping-list button.
+- Recipe cards show ingredient-overlap counts with the current shopping list.
+- Recipe shopping-list buttons receive a gold border when all recipe ingredients are already covered by the shopping list.
+- Shopping-list ingredients are merged by canonical ingredient and unit.
+- Added optional market definitions and per-ingredient supermarket availability in `cookbook-library.json`.
+- Added shopping strategies for favorite-store-first, fewest-stores, and per-ingredient store visibility.
+- Added optional favorite supermarket and shopping-list email recipient settings.
+- Added email composition for shopping lists via the system mail client.
 - JSON-based cookbook database stored inside the vault.
 - Support for one or multiple `recipes-*.json` files in a single cookbook folder.
 - Ingredient catalog with units, package sizes, resource priority, and package rounding thresholds.

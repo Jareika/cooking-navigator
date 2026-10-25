@@ -1,4 +1,9 @@
-import { App, PluginSettingTab, TFile } from "obsidian";
+import {
+  App,
+  PluginSettingTab,
+  TFile,
+  type SettingDefinitionItem,
+} from "obsidian";
 import type CookbookPlugin from "./main";
 
 export class CookbookSettingTab extends PluginSettingTab {
@@ -30,7 +35,17 @@ export class CookbookSettingTab extends PluginSettingTab {
     }
   }
 
-  getSettingDefinitions() {
+  getSettingDefinitions(): SettingDefinitionItem<string>[] {
+    const favoriteStoreOptions: Record<string, string> = {
+      "": "Kein Favorit",
+    };
+
+    for (const market of this.plugin.getKnownMarkets(
+      this.plugin.settings.shoppingLocationId,
+    )) {
+      favoriteStoreOptions[market.id] = market.name;
+    }
+
     return [
       {
         name: "Cookbook folder",
@@ -59,10 +74,23 @@ export class CookbookSettingTab extends PluginSettingTab {
       {
         name: "Create JSON backups",
         desc:
-          "Keeps two rotating backups for every cookbook JSON file written by the plugin. Missing original files can be restored automatically from the newest valid backup.",
+          "Erstellt rotierende Sicherungen für JSON-Dateien, die vom Plugin geschrieben werden. Fehlende Bibliotheken können aus der neuesten gültigen Sicherung wiederhergestellt werden.",
         control: {
           type: "toggle" as const,
           key: "enableJsonBackups",
+        },
+      },
+      {
+        name: "Anzahl der JSON-Sicherungen",
+        desc:
+          "Bei 2 Sicherungen werden die vorherigen Dateistände behalten. Ab 3 Sicherungen wird zusätzlich der aktuell gespeicherte Stand gesichert.",
+        control: {
+          type: "slider" as const,
+          key: "jsonBackupCount",
+          min: 2,
+          max: 5,
+          step: 1,
+          disabled: () => !this.plugin.settings.enableJsonBackups,
         },
       },
       {
@@ -105,6 +133,35 @@ export class CookbookSettingTab extends PluginSettingTab {
         },
       },
       {
+        type: "group" as const,
+        heading: "Koch-Timer",
+        items: [
+          {
+            name: "Klingelton",
+            desc:
+              "Optionale Sounddatei aus dem Vault. Sie wird abgespielt, wenn ein Koch-Timer abläuft.",
+            control: {
+              type: "file" as const,
+              key: "timerAlarmSoundPath",
+              placeholder: "Sounddatei auswählen…",
+              filter: isAudioFile,
+            },
+          },
+          {
+            name: "Timer-Lautstärke",
+            desc:
+              "Lautstärke des Klingeltons. Bei gesperrten Mobilgeräten kann die Wiedergabe systembedingt eingeschränkt sein.",
+            control: {
+              type: "slider" as const,
+              key: "timerAlarmVolume",
+              min: 0,
+              max: 1,
+              step: 0.05,
+            },
+          },
+        ],
+      },
+      {
         name: "Image for “All recipes” button",
         desc:
           "Optionally select a square vault image for the first category button in the recipe browser.",
@@ -116,22 +173,66 @@ export class CookbookSettingTab extends PluginSettingTab {
         },
       },
       {
+        type: "group" as const,
+        heading: "Einkaufsliste",
+        items: [
+          {
+            name: "Marktstrategie",
+            desc:
+              "Legt fest, ob der Favoritenmarkt bevorzugt, die kleinste Markt-Kombination gesucht oder Märkte direkt je Zutat angezeigt werden.",
+            control: {
+              type: "dropdown" as const,
+              key: "shoppingStoreMode",
+              options: {
+                "favorite-first": "Favoritenmarkt zuerst",
+                "fewest-stores": "Möglichst wenige Märkte",
+                "ingredient-stores": "Märkte je Zutat anzeigen",
+              },
+            },
+          },
+          {
+            name: "Bevorzugter Markt",
+            desc:
+              "Wird im Modus „Favoritenmarkt zuerst“ verwendet und bei gleich guten Markt-Kombinationen bevorzugt.",
+            control: {
+              type: "dropdown" as const,
+              key: "favoriteStoreId",
+              options: favoriteStoreOptions,
+            },
+          },
+          {
+            name: "Zutaten, Orte und Märkte verwalten",
+            desc:
+              "Verwaltet Zutaten, Packungsgrößen, Einkaufsorte, Supermärkte und die Marktverfügbarkeit einzelner Zutaten.",
+            action: () => {
+              this.plugin.openIngredientManagement(() => {
+                void this.plugin.refreshCategoryButtons();
+              });
+            },
+          },
+          {
+            name: "Empfänger für Einkaufslisten",
+            desc:
+              "Optional. Der Versand öffnet eine vorbereitete E-Mail in der Standard-Mail-App; das Plugin versendet keine E-Mails selbst.",
+            control: {
+              type: "text" as const,
+              key: "shoppingListEmailRecipient",
+              placeholder: "name@example.com",
+              validate: (value: string) =>
+                value.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+                  ? undefined
+                  : "Bitte eine gültige E-Mail-Adresse eingeben.",
+            },
+          },
+        ],
+      },
+      {
         type: "list" as const,
         heading: "Category buttons",
         emptyState:
           "No categories found yet. Create or select a cookbook database first.",
-        onReorder: async (oldIndex: number, newIndex: number) => {
-          const [moved] = this.plugin.settings.categoryButtons.splice(
-            oldIndex,
-            1,
-          );
-
-          if (!moved) {
-            return;
-          }
-
-          this.plugin.settings.categoryButtons.splice(newIndex, 0, moved);
-          await this.plugin.saveSettings();
+        onReorder: (oldIndex: number, newIndex: number) => {
+          void this.reorderCategoryButtons(oldIndex, newIndex);
         },
         items: this.plugin.getOrderedCategories().map(
           ({ category }, index) => ({
@@ -155,21 +256,39 @@ export class CookbookSettingTab extends PluginSettingTab {
           {
             name: "Create example database",
             desc: "Creates example JSON files if they do not exist yet.",
-            action: async () => {
-              await this.plugin.createExampleDatabase();
-              this.plugin.notice("Example cookbook database created.");
+            action: () => {
+              void this.createExampleDatabase();
             },
           },
           {
             name: "Open cookbook",
             desc: "Reload the JSON database and open the recipe browser.",
-            action: async () => {
-              await this.plugin.openCookbook();
+            action: () => {
+              void this.plugin.openCookbook();
             },
           },
         ],
       },
     ];
+  }
+
+  private async reorderCategoryButtons(
+    oldIndex: number,
+    newIndex: number,
+  ): Promise<void> {
+    const [moved] = this.plugin.settings.categoryButtons.splice(oldIndex, 1);
+
+    if (!moved) {
+      return;
+    }
+
+    this.plugin.settings.categoryButtons.splice(newIndex, 0, moved);
+    await this.plugin.saveSettings();
+  }
+
+  private async createExampleDatabase(): Promise<void> {
+    await this.plugin.createExampleDatabase();
+    this.plugin.notice("Example cookbook database created.");
   }
 }
 
@@ -182,6 +301,21 @@ function isImageFile(file: TFile): boolean {
     "png",
     "svg",
     "webp",
+  ].includes(file.extension.toLocaleLowerCase());
+}
+
+function isAudioFile(file: TFile): boolean {
+  return [
+    "aac",
+    "flac",
+    "m4a",
+    "mp3",
+    "oga",
+    "ogg",
+    "opus",
+    "wav",
+    "weba",
+    "webm",
   ].includes(file.extension.toLocaleLowerCase());
 }
 

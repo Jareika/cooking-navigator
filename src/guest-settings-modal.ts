@@ -715,9 +715,3 @@ function initials(name: string): string {
     .slice(0, 2)
     .toUpperCase();
 }
-
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat(undefined, {
-    maximumFractionDigits: 1,
-  }).format(value);
-}

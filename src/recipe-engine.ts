@@ -18,6 +18,11 @@ interface IngredientResolution {
   usesAlternative: boolean;
 }
 
+export interface RecipePlanOptions {
+  packageStoreIds?: Iterable<string>;
+  manualScaleFactor?: number;
+}
+
 export function findRecipeMatches(
   recipes: Recipe[],
   library: CookbookLibrary,
@@ -229,6 +234,7 @@ export function buildRecipePlan(
   recipe: Recipe,
   library: CookbookLibrary,
   selectedPeople: CookbookPerson[],
+  options: RecipePlanOptions = {},
 ): RecipePlan {
   const ingredientMap = new Map(
     library.ingredients.map((ingredient) => [ingredient.id, ingredient]),
@@ -245,20 +251,32 @@ export function buildRecipePlan(
   const requestedScaleFactor =
     eaterTotal > 0 ? eaterTotal / recipe.baseEaters : 1;
 
-  const packageAnchor = findPackageAnchor(
-    recipe,
-	selectedPeople,
-    ingredientMap,
-	allergenMap,
-    requestedScaleFactor,
-  );
+  const manualScaleFactor =
+    options.manualScaleFactor &&
+    Number.isFinite(options.manualScaleFactor) &&
+    options.manualScaleFactor > 0
+      ? options.manualScaleFactor
+      : undefined;
 
-  const scaleFactor = packageAnchor
-    ? Math.max(
+  const packageAnchor = manualScaleFactor
+    ? undefined
+    : findPackageAnchor(
+        recipe,
+        selectedPeople,
+        ingredientMap,
+        allergenMap,
         requestedScaleFactor,
-        packageAnchor.resultingScale,
-      )
-    : requestedScaleFactor;
+        options.packageStoreIds,
+      );
+
+  const scaleFactor = manualScaleFactor
+    ? manualScaleFactor
+    : packageAnchor
+      ? Math.max(
+          requestedScaleFactor,
+          packageAnchor.resultingScale,
+        )
+      : requestedScaleFactor;
 
   const scale = (item: RecipeIngredient): ScaledIngredient => {
     const resolved = resolveIngredient(
@@ -329,6 +347,7 @@ function findPackageAnchor(
   ingredientMap: Map<string, IngredientDefinition>,
   allergenMap: Map<string, AllergenDefinition>,
   requestedScaleFactor: number,
+  packageStoreIds?: Iterable<string>,
 ):
   | {
       ingredient: IngredientDefinition;
@@ -370,9 +389,14 @@ function findPackageAnchor(
 
   for (const candidate of candidates) {
     const requiredAmount = candidate.recipeIngredient.amount * requestedScaleFactor;
+    const packageSizes = getPackageSizesForStores(
+      candidate.ingredient,
+      packageStoreIds,
+    );
+
     const chosenAmount = choosePackageAmount(
       requiredAmount,
-      candidate.ingredient.packageSizes ?? [],
+      packageSizes,
       candidate.ingredient.packageRoundUpThreshold ?? 0.75,
     );
 
@@ -393,6 +417,28 @@ function findPackageAnchor(
   }
 
   return best;
+}
+
+function getPackageSizesForStores(
+  ingredient: IngredientDefinition,
+  packageStoreIds?: Iterable<string>,
+): number[] {
+  const storeIds = packageStoreIds ? [...packageStoreIds] : [];
+
+  if (storeIds.length === 0) {
+    return ingredient.packageSizes ?? [];
+  }
+
+  const packageSizes = storeIds.flatMap(
+    (storeId) =>
+      ingredient.storePackageSizes?.[storeId] ??
+      ingredient.packageSizes ??
+      [],
+  );
+
+  return [...new Set(packageSizes)]
+    .filter((size) => Number.isFinite(size) && size > 0)
+    .sort((a, b) => a - b);
 }
 
 /**
