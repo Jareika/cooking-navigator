@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+- Added a stable in-plugin recipe-creation modal with recipe metadata, shopping-list ingredients, cooking steps, step ingredients, timers, images, categories, restriction scopes, and automatic unique recipe IDs.
+- Added a recipe-creation action to the Cookbook right-side action bar.
+- Added a cancel button for timers in the active-timer overview.
+- Added a direct action-bar button in cooking mode to return to the recipe browser.
+- Added a Style Settings option to hide the bottom cooking navigation buttons when swipe navigation is preferred.
 - Added an independent cooking-timer controller with support for multiple parallel recipe timers.
 - Recipe steps with `timerMinutes` now provide start, pause, resume, add-one-minute, cancel, and restart controls.
 - Added a persistent-on-page-change active-timer overview in cooking mode.

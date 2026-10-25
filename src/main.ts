@@ -17,10 +17,12 @@ import type {
   RecipeCategory,
   RecipeDocument,
   RecipeScaleOverride,
+  Recipe,
   ShoppingLocation,
   StoreDefinition,
 } from "./types";
 import { IngredientManagementModal } from "./ingredient-management-modal";
+import { RecipeEditorModal } from "./recipe-editor-modal";
 
 interface ObsidianSettingsView {
   open(): void;
@@ -490,6 +492,14 @@ export default class CookbookPlugin extends Plugin {
 
   openIngredientManagement(onChanged: () => void): void {
     new IngredientManagementModal(this.app, this, onChanged).open();
+  }
+  
+  openRecipeEditor(onChanged: () => void): void {
+    new RecipeEditorModal(this.app, this, onChanged).open();
+  }
+
+  async createRecipe(recipe: Recipe): Promise<void> {
+    await this.database.createRecipe(recipe);
   }
 
   getOrderedCategories(

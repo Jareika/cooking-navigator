@@ -556,6 +556,24 @@ export class CookbookView extends ItemView {
 	
     if (this.screen.kind === "cook") {
       const recipe = this.screen.recipe;
+	  
+      const backToBrowserButton = actions.createEl("button", {
+        cls: [
+          "cookbook-browser-action",
+          "cookbook-back-to-browser-action",
+        ],
+        attr: {
+          "aria-label": "Zur Rezeptübersicht",
+          title: "Zur Rezeptübersicht",
+        },
+      });
+
+      setIcon(backToBrowserButton, "book-open");
+
+      backToBrowserButton.addEventListener("click", () => {
+        this.screen = { kind: "browser" };
+        this.render();
+      });
 
       const scaleButton = actions.createEl("button", {
         cls: [
@@ -619,6 +637,25 @@ export class CookbookView extends ItemView {
         void this.requestShoppingPlanningReset();
       });
     }
+	
+    const createRecipeButton = actions.createEl("button", {
+      cls: [
+        "cookbook-browser-action",
+        "cookbook-create-recipe-action",
+      ],
+      attr: {
+        "aria-label": "Neues Rezept erstellen",
+        title: "Neues Rezept erstellen",
+      },
+    });
+
+    setIcon(createRecipeButton, "file-plus-2");
+
+    createRecipeButton.addEventListener("click", () => {
+      this.plugin.openRecipeEditor(() => {
+        void this.reload();
+      });
+    });
 	
     const manageIngredientsButton = actions.createEl("button", {
       cls: [
@@ -1817,6 +1854,18 @@ export class CookbookView extends ItemView {
 
         addMinuteButton.addEventListener("click", () => {
           this.plugin.cookingTimers.addSeconds(timer.id, 60);
+        });
+
+        const cancelButton = row.createEl("button", {
+          text: "Abbrechen",
+          attr: {
+            "aria-label": `${timer.label} abbrechen`,
+            title: "Timer abbrechen",
+          },
+        });
+
+        cancelButton.addEventListener("click", () => {
+          this.plugin.cookingTimers.cancel(timer.id);
         });
       }
     };

@@ -115,6 +115,14 @@ settings:
     format: hex
     opacity: false
     default: '#4b3566'
+  -
+    id: cookbook-show-cooking-navigation
+    title: Koch-Navigation unten anzeigen
+    title.de: Koch-Navigation unten anzeigen
+    description: Zeigt die Buttons „Zurück“ und „Weiter“ am unteren Rand des Kochmodus an. Auf Mobilgeräten kann die Navigation stattdessen ausschließlich per Wischgeste erfolgen.
+    description.de: Zeigt die Buttons „Zurück“ und „Weiter“ am unteren Rand des Kochmodus an. Auf Mobilgeräten kann die Navigation stattdessen ausschließlich per Wischgeste erfolgen.
+    type: class-toggle
+    default: true
 
 */
 
@@ -578,6 +586,21 @@ body.cookbook-focus-mode.is-mobile .mobile-navbar {
   margin: 1rem 0;
 }
 
+.cookbook-recipe-scale-editor {
+  display: grid;
+  gap: 0.75rem;
+  margin: -0.15rem 0 0.35rem;
+  padding: 0.85rem;
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--interactive-accent) 45%,
+      var(--background-modifier-border)
+    );
+  border-radius: 0.65rem;
+  background: var(--background-secondary);
+}
+
 .cookbook-recipe-scale-ingredient {
   display: flex;
   align-items: center;
@@ -589,6 +612,11 @@ body.cookbook-focus-mode.is-mobile .mobile-navbar {
 .cookbook-recipe-scale-ingredient.is-selected {
   border-color: var(--interactive-accent);
   color: var(--interactive-accent);
+}
+
+.cookbook-recipe-scale-ingredient.is-selected {
+  border-bottom-left-radius: 0.3rem;
+  border-bottom-right-radius: 0.3rem;
 }
 
 .cookbook-recipe-scale-value-field {
@@ -1308,7 +1336,7 @@ body:not(.cookbook-show-category-button-chrome)
 
 .cookbook-active-timer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem;
@@ -1332,6 +1360,10 @@ body:not(.cookbook-show-category-button-chrome)
   grid-template-columns: 1fr auto 1fr;
   gap: 0.75rem;
   align-items: center;
+}
+
+body:not(.cookbook-show-cooking-navigation) .cookbook-cooking-footer {
+  display: none;
 }
 
 .cookbook-cooking-footer button:last-child {
@@ -1379,6 +1411,128 @@ body:not(.cookbook-show-category-button-chrome)
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
   background: var(--background-primary);
+}
+
+.cookbook-recipe-editor-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.cookbook-recipe-editor-section {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 0.75rem;
+  background: var(--background-secondary);
+}
+
+.cookbook-recipe-editor-section h3 {
+  margin: 0;
+}
+
+.cookbook-recipe-editor-section-header,
+.cookbook-recipe-editor-step-header,
+.cookbook-recipe-editor-step-ingredients-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cookbook-recipe-editor-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.cookbook-recipe-editor-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.cookbook-recipe-editor-field input,
+.cookbook-recipe-editor-field select,
+.cookbook-recipe-editor-field textarea {
+  min-width: 0;
+  width: 100%;
+}
+
+.cookbook-recipe-editor-checkbox-group {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.cookbook-recipe-editor-checkbox-group > small {
+  color: var(--text-muted);
+}
+
+.cookbook-recipe-editor-checkbox-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cookbook-recipe-editor-checkbox-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 0.45rem;
+  background: var(--background-primary);
+}
+
+.cookbook-recipe-editor-add-category {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.cookbook-recipe-editor-add-category input {
+  min-width: 0;
+}
+
+.cookbook-recipe-editor-step {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 0.65rem;
+  background: var(--background-primary);
+}
+
+.cookbook-recipe-editor-ingredient-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.cookbook-recipe-editor-ingredient {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.75rem;
+  border-radius: 0.55rem;
+  background: var(--background-primary);
+}
+
+.cookbook-recipe-editor-ingredient-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.cookbook-recipe-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 @media (max-width: 700px) {
@@ -1446,7 +1600,20 @@ body:not(.cookbook-show-category-button-chrome)
     grid-template-columns: minmax(0, 1fr) auto auto;
   }
 
-  .cookbook-active-timer button:last-child {
+  .cookbook-active-timer button:nth-last-child(-n + 2) {
     grid-column: 2 / -1;
+  }
+
+  .cookbook-recipe-editor-fields,
+  .cookbook-recipe-editor-ingredient-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .cookbook-recipe-editor-add-category {
+    grid-template-columns: 1fr;
+  }
+
+  .cookbook-recipe-editor-add-category button {
+    justify-self: start;
   }
 }

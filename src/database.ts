@@ -107,6 +107,37 @@ export class CookbookDatabase {
     }
   }
 
+  /**
+   * Fügt ein neu erstelltes Rezept zur konfigurierten Standard-Rezeptdatei
+   * hinzu. Existiert diese Datei noch nicht, wird sie als gültiges
+   * RecipeDocument angelegt.
+   */
+  async createRecipe(recipe: Recipe): Promise<void> {
+    await this.ensureFolder();
+
+    const recipePath = normalizePath(
+      `${this.folder}/${this.getSettings().defaultRecipeFile}`,
+    );
+
+    const content = await this.readJsonFile(recipePath);
+    const document =
+      content === null
+        ? ({
+            version: 1,
+            recipes: [],
+          } satisfies RecipeDocument)
+        : (JSON.parse(content) as RecipeDocument);
+
+    if (document.recipes.some((entry) => entry.id === recipe.id)) {
+      throw new Error(
+        `A recipe with the ID "${recipe.id}" already exists in "${recipePath}".`,
+      );
+    }
+
+    document.recipes.push(recipe);
+    await this.writeJson(recipePath, document);
+  }
+
   private async writeJson(path: string, value: unknown): Promise<void> {
     const nextContent = JSON.stringify(value, null, 2);
 
