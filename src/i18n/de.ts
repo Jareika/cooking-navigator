@@ -85,6 +85,12 @@ export const de: TranslationDictionary = {
     selectLocation: "Bitte einen Ort auswählen",
     empty: "Deine Einkaufsliste ist noch leer.",
     recipes: "Rezepte",
+    preparationRecipes: "Selbst zubereiten",
+    prepareRecipeAriaLabel: "„{{title}}“ selbst zubereiten",
+    preparedRecipeTitle: "{{title}} (selbst zubereitet)",
+    preparationScaling:
+      "{{requiredAmount}} {{unit}} benötigt · Ausgaberezept: {{yieldAmount}} {{unit}} · Faktor {{scale}}",
+    preparationUsedFor: "Verwendet in: {{recipes}}",
     noRecipesSelected: "Noch keine Rezepte ausgewählt.",
     removeRecipe: "{{title}} aus der Einkaufsliste entfernen",
     addRecipe: "{{title}} zur Einkaufsliste hinzufügen",
@@ -143,6 +149,9 @@ export const de: TranslationDictionary = {
     step: "Schritt {{number}}",
     activeTimers: "Aktive Timer",
     imageLoadError: "Rezeptbild konnte nicht geladen werden.",
+    openPreparationRecipe: "Zubereitungsrezept öffnen",
+    preparationRecipeNotFound:
+      "Das Zubereitungsrezept „{{recipeId}}“ wurde nicht gefunden.",
   },
   timer: {
     title: "Koch-Timer",
@@ -187,12 +196,22 @@ export const de: TranslationDictionary = {
       "Das Rezept „{{title}}“ ist nicht mit den ausgewählten Gästen kompatibel.",
     ingredientReferencesUnknownAllergen:
       "Die Zutat „{{name}}“ verweist auf das unbekannte Allergen „{{allergenId}}“.",
+    preparationRecipeNotFound:
+      "Für „{{ingredient}}“ wurde das Zubereitungsrezept „{{recipeId}}“ nicht gefunden.",
+    preparationRecipeOutputMissing:
+      "Das Zubereitungsrezept „{{title}}“ benötigt eine gültige Angabe „produces“ mit Ausgabemenge.",
+    preparationRecipeProducesWrongIngredient:
+      "Das Zubereitungsrezept „{{title}}“ produziert nicht die benötigte Zutat „{{ingredient}}“.",
+    preparationRecipeUnitMismatch:
+      "Das Zubereitungsrezept „{{title}}“ verwendet eine inkompatible Einheit: erwartet „{{expectedUnit}}“, erhalten „{{actualUnit}}“.",
+    preparationRecipeCycle:
+      "Zyklische Zubereitungsrezepte sind nicht erlaubt: {{title}}.",
   },
   resetShoppingPlanning: {
     title: "Einkaufsplanung zurücksetzen?",
     description:
       "Die Einkaufsliste, ausgewählte Gäste, manuelle Skalierungen, " +
-      "als zuhause markierte Zutaten und der Einkaufsort werden gelöscht.",
+      "als zuhause markierte Zutaten, Selbstzubereitungen und der Einkaufsort werden gelöscht.",
     dontAskAgain: "Nicht erneut nachfragen",
     cancel: "Abbrechen",
     confirm: "Zurücksetzen",
@@ -255,6 +274,12 @@ export const de: TranslationDictionary = {
       categories: "Kategorien",
       restrictionScopes: "Einschränkungsbereiche",
     },
+    produces: {
+      enabled: "Dieses Rezept stellt eine Zutat her",
+      ingredient: "Hergestellte Zutat",
+      amount: "Erzeugte Menge",
+      unit: "Einheit der Ausgabemenge",
+    },
     categories: {
       placeholder: "Neue Kategorie, z. B. Aufläufe",
       nameAriaLabel: "Name der neuen Kategorie",
@@ -274,6 +299,8 @@ export const de: TranslationDictionary = {
       amount: "Menge",
       alternative: "Alternative",
       noAlternative: "Keine Alternative",
+      preparationRecipe: "Zubereitungsrezept",
+      noPreparationRecipe: "Zutat kaufen / kein Zubereitungsrezept",
       suffix: "Zusatz",
       suffixPlaceholder: "z. B. gehackt",
       note: "Hinweis",
@@ -305,6 +332,8 @@ export const de: TranslationDictionary = {
         "Bitte füge mindestens eine Zutat für die Einkaufsliste hinzu.",
       invalidIngredient:
         "Jede Zutat benötigt eine gültige Auswahl und eine Menge größer als null.",
+      invalidProducedAmount:
+        "Für die hergestellte Zutat müssen Zutat, Menge größer als null und Einheit angegeben werden.",
       stepIngredientNotAssigned:
         "Kochschritte dürfen nur Zutaten verwenden, die dem Rezept zugeordnet wurden.",
       stepsRequired:

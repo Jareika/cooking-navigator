@@ -265,6 +265,113 @@ export class RecipeEditorModal extends Modal {
         this.draft.restrictionScopeIds = ids;
       },
     );
+
+    this.renderProducesControls(section);
+  }
+  
+  private renderProducesControls(parent: HTMLElement): void {
+    if (!this.library) {
+      return;
+    }
+
+    const section = parent.createDiv(
+      "cookbook-recipe-editor-produces",
+    );
+
+    const enabledLabel = section.createEl("label", {
+      cls: "cookbook-recipe-editor-produces-enabled",
+    });
+
+    const enabledInput = enabledLabel.createEl("input", {
+      attr: {
+        type: "checkbox",
+      },
+    });
+
+    enabledInput.checked = Boolean(this.draft.produces);
+    enabledLabel.createSpan({
+      text: t("recipeEditor.produces.enabled"),
+    });
+
+    const fields = section.createDiv("cookbook-recipe-editor-fields");
+    fields.toggleClass("is-disabled", !enabledInput.checked);
+
+    const ingredientLabel = fields.createEl("label", {
+      cls: "cookbook-recipe-editor-field",
+      text: t("recipeEditor.produces.ingredient"),
+    });
+
+    const ingredientSelect = ingredientLabel.createEl("select");
+
+    for (const ingredient of [...this.library.ingredients].sort((a, b) =>
+      a.name.localeCompare(b.name, "de"),
+    )) {
+      ingredientSelect.createEl("option", {
+        value: ingredient.id,
+        text: `${ingredient.name} (${ingredient.defaultUnit})`,
+      });
+    }
+
+    const defaultIngredient = this.library.ingredients[0];
+    ingredientSelect.value =
+      this.draft.produces?.ingredientId ??
+      defaultIngredient?.id ??
+      "";
+
+    const amountInput = this.createNumberField(
+      fields,
+      t("recipeEditor.produces.amount"),
+      this.draft.produces?.amount ?? 1,
+      0.1,
+      0.1,
+    );
+
+    const unitInput = this.createTextField(
+      fields,
+      t("recipeEditor.produces.unit"),
+      this.draft.produces?.unit ??
+        defaultIngredient?.defaultUnit ??
+        "",
+    );
+
+    const updateProduces = (): void => {
+      if (!enabledInput.checked) {
+        this.draft.produces = undefined;
+        fields.toggleClass("is-disabled", true);
+        ingredientSelect.disabled = true;
+        amountInput.disabled = true;
+        unitInput.disabled = true;
+        return;
+      }
+
+      this.draft.produces = {
+        ingredientId: ingredientSelect.value,
+        amount: Number(amountInput.value),
+        unit: unitInput.value.trim() || undefined,
+      };
+
+      fields.toggleClass("is-disabled", false);
+      ingredientSelect.disabled = false;
+      amountInput.disabled = false;
+      unitInput.disabled = false;
+    };
+
+    enabledInput.addEventListener("change", updateProduces);
+    ingredientSelect.addEventListener("change", () => {
+      const ingredient = this.library?.ingredients.find(
+        (entry) => entry.id === ingredientSelect.value,
+      );
+
+      if (ingredient && !unitInput.value.trim()) {
+        unitInput.value = ingredient.defaultUnit;
+      }
+
+      updateProduces();
+    });
+    amountInput.addEventListener("change", updateProduces);
+    unitInput.addEventListener("input", updateProduces);
+
+    updateProduces();
   }
 
   private renderRecipeIngredients(parent: HTMLElement): void {
@@ -490,6 +597,7 @@ export class RecipeEditorModal extends Modal {
       ingredientSelect.addEventListener("change", () => {
         if (stepIndex === undefined) {
           ingredient.ingredientId = ingredientSelect.value;
+		  ingredient.preparationRecipeId = undefined;
           return;
         }
 
@@ -550,6 +658,41 @@ export class RecipeEditorModal extends Modal {
         ingredient.alternativeIngredientId =
           alternativeSelect.value || undefined;
       });
+	  
+      if (stepIndex === undefined) {
+        const preparationLabel = fields.createEl("label", {
+          cls: "cookbook-recipe-editor-field",
+          text: t("recipeEditor.ingredients.preparationRecipe"),
+        });
+
+        const preparationSelect = preparationLabel.createEl("select");
+        preparationSelect.createEl("option", {
+          value: "",
+          text: t("recipeEditor.ingredients.noPreparationRecipe"),
+        });
+
+        const preparationRecipes = this.existingRecipes
+          .filter(
+            (recipe) =>
+              recipe.produces?.ingredientId === ingredient.ingredientId,
+          )
+          .sort((a, b) => a.title.localeCompare(b.title, "de"));
+
+        for (const recipe of preparationRecipes) {
+          preparationSelect.createEl("option", {
+            value: recipe.id,
+            text: recipe.title,
+          });
+        }
+
+        preparationSelect.value =
+          ingredient.preparationRecipeId ?? "";
+
+        preparationSelect.addEventListener("change", () => {
+          ingredient.preparationRecipeId =
+            preparationSelect.value || undefined;
+        });
+      }
 
       const suffixInput = this.createTextField(
         fields,
@@ -628,6 +771,24 @@ export class RecipeEditorModal extends Modal {
     ) {
       this.plugin.notice(
         t("recipeEditor.validation.invalidIngredient"),
+      );
+      return;
+    }
+	
+    if (
+      this.draft.produces &&
+      (
+        !this.library?.ingredients.some(
+          (ingredient) =>
+            ingredient.id === this.draft.produces?.ingredientId,
+        ) ||
+        !Number.isFinite(this.draft.produces.amount) ||
+        this.draft.produces.amount <= 0 ||
+        !this.draft.produces.unit?.trim()
+      )
+    ) {
+      this.plugin.notice(
+        t("recipeEditor.validation.invalidProducedAmount"),
       );
       return;
     }
@@ -752,6 +913,7 @@ export class RecipeEditorModal extends Modal {
     stepIndex: number,
   ): void {
     target.ingredientId = source.ingredientId;
+	target.preparationRecipeId = source.preparationRecipeId;
     target.alternativeIngredientId = source.alternativeIngredientId;
     target.unit = source.unit;
     target.unitPlural = source.unitPlural;

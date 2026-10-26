@@ -82,6 +82,12 @@ export const en = {
     selectLocation: "Please select a location",
     empty: "Your shopping list is still empty.",
     recipes: "Recipes",
+    preparationRecipes: "Prepare yourself",
+    prepareRecipeAriaLabel: "Prepare “{{title}}” yourself",
+    preparedRecipeTitle: "{{title}} (prepared)",
+    preparationScaling:
+      "{{requiredAmount}} {{unit}} needed · recipe yield: {{yieldAmount}} {{unit}} · factor {{scale}}",
+    preparationUsedFor: "Used in: {{recipes}}",
     noRecipesSelected: "No recipes selected yet.",
     removeRecipe: "Remove {{title}} from shopping list",
     addRecipe: "Add {{title}} to shopping list",
@@ -141,6 +147,9 @@ export const en = {
     step: "Step {{number}}",
     activeTimers: "Active timers",
     imageLoadError: "Recipe image could not be loaded.",
+    openPreparationRecipe: "Open preparation recipe",
+    preparationRecipeNotFound:
+      "The preparation recipe “{{recipeId}}” could not be found.",
   },
   timer: {
     title: "Cooking timer",
@@ -184,12 +193,22 @@ export const en = {
       "The recipe \"{{title}}\" is not compatible with the selected guests.",
     ingredientReferencesUnknownAllergen:
       "The ingredient \"{{name}}\" references the unknown allergen \"{{allergenId}}\".",
+    preparationRecipeNotFound:
+      "The preparation recipe \"{{recipeId}}\" for \"{{ingredient}}\" could not be found.",
+    preparationRecipeOutputMissing:
+      "The preparation recipe \"{{title}}\" requires a valid produces declaration with an output amount.",
+    preparationRecipeProducesWrongIngredient:
+      "The preparation recipe \"{{title}}\" does not produce the required ingredient \"{{ingredient}}\".",
+    preparationRecipeUnitMismatch:
+      "The preparation recipe \"{{title}}\" uses an incompatible unit: expected \"{{expectedUnit}}\", received \"{{actualUnit}}\".",
+    preparationRecipeCycle:
+      "Cyclic preparation recipes are not allowed: {{title}}.",
   },
   resetShoppingPlanning: {
     title: "Reset shopping planning?",
     description:
       "The shopping list, selected guests, manual scaling, ingredients " +
-      "marked as already available at home, and the shopping location will be cleared.",
+      "marked as already available at home, prepared recipes, and the shopping location will be cleared.",
     dontAskAgain: "Don't ask again",
     cancel: "Cancel",
     confirm: "Reset",
@@ -252,6 +271,12 @@ export const en = {
       categories: "Categories",
       restrictionScopes: "Restriction scopes",
     },
+    produces: {
+      enabled: "This recipe produces an ingredient",
+      ingredient: "Produced ingredient",
+      amount: "Produced amount",
+      unit: "Output unit",
+    },
     categories: {
       placeholder: "New category, e.g. Casseroles",
       nameAriaLabel: "New category name",
@@ -271,6 +296,8 @@ export const en = {
       amount: "Amount",
       alternative: "Alternative",
       noAlternative: "No alternative",
+      preparationRecipe: "Preparation recipe",
+      noPreparationRecipe: "Buy ingredient / no preparation recipe",
       suffix: "Addition",
       suffixPlaceholder: "e.g. chopped",
       note: "Note",
@@ -301,6 +328,8 @@ export const en = {
         "Please add at least one ingredient to the shopping list.",
       invalidIngredient:
         "Every ingredient needs a valid selection and an amount greater than zero.",
+      invalidProducedAmount:
+        "The produced ingredient needs an ingredient, an amount greater than zero, and a unit.",
       stepIngredientNotAssigned:
         "Cooking steps may only use ingredients assigned to the recipe.",
       stepsRequired:

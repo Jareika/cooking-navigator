@@ -333,6 +333,36 @@ settings:
   margin: 1rem 0;
 }
 
+.cookbook-shopping-preparation-recipes {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 0.75rem;
+  background: var(--background-secondary);
+}
+
+.cookbook-shopping-preparation-recipe {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.65rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background: var(--background-primary);
+  cursor: pointer;
+}
+
+.cookbook-shopping-preparation-recipe-details {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.cookbook-shopping-preparation-recipe-details small {
+  color: var(--text-muted);
+}
+
 .cookbook-shopping-dynamic-content {
   min-width: 0;
 }
@@ -1257,6 +1287,11 @@ body:not(.cookbook-show-category-button-chrome)
   color: var(--text-muted);
 }
 
+.cookbook-ingredient-preparation-link {
+  margin-top: 0.5rem;
+  font-size: 0.85em;
+}
+
 .cookbook-ingredient-alternative {
   color: var(--cookbook-alternative-ingredient-color, #4b3566) !important;
   font-weight: 600;
@@ -1460,6 +1495,23 @@ body:not(.cookbook-show-cooking-navigation) .cookbook-cooking-footer {
 .cookbook-recipe-editor-checkbox-group {
   display: grid;
   gap: 0.4rem;
+}
+
+.cookbook-recipe-editor-produces {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.cookbook-recipe-editor-produces-enabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cookbook-recipe-editor-fields.is-disabled {
+  opacity: 0.55;
 }
 
 .cookbook-recipe-editor-checkbox-group > small {

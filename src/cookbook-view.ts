@@ -19,6 +19,7 @@ import { buildRecipePlan, findRecipeMatches } from "./recipe-engine";
 import { RecipeScaleModal } from "./recipe-scale-modal";
 import { ResetShoppingPlanningModal } from "./reset-shopping-planning-modal";
 import {
+  buildResolvedShoppingList,
   buildShoppingList,
   createShoppingStorePlan,
   getResolvedRecipeIngredientIds,
@@ -604,6 +605,7 @@ export class CookbookView extends ItemView {
       this.plugin.getShoppingRecipeIds().length > 0 ||
       this.plugin.getShoppingExcludedIngredientIds().length > 0 ||
       this.plugin.getActiveGuestIds().length > 0 ||
+	  this.plugin.getPreparedRecipeIds().length > 0 ||
       Object.keys(this.plugin.settings.manualRecipeScaleOverrides).length > 0 ||
       Boolean(this.plugin.settings.shoppingLocationId);
 
@@ -1002,10 +1004,16 @@ export class CookbookView extends ItemView {
     this.renderManualShoppingItems(content, manualItems);
 
     const selectedPeople = this.getSelectedPeople();
-    const unscaledItems = buildShoppingList(
+    const preparedRecipeIds = this.plugin.getPreparedRecipeIds();
+
+    const preliminaryShoppingList = buildResolvedShoppingList(
       recipes,
       this.library,
       selectedPeople,
+      {
+        allRecipes: this.recipes,
+        preparedRecipeIds,
+      },
     );
 
     const marketsAtSelectedLocation = selectedLocationId
@@ -1016,7 +1024,7 @@ export class CookbookView extends ItemView {
       this.plugin.getShoppingExcludedIngredientIds(),
     );
 
-    const activeUnscaledItems = unscaledItems.filter(
+    const activeUnscaledItems = preliminaryShoppingList.items.filter(
       (item) => !excludedIngredientIds.has(item.ingredient.id),
     );
 
@@ -1028,11 +1036,13 @@ export class CookbookView extends ItemView {
       marketsAtSelectedLocation.map((market) => market.id),
     );
 
-    const allItems = buildShoppingList(
+    const resolvedShoppingList = buildResolvedShoppingList(
       recipes,
       this.library,
       selectedPeople,
       {
+        allRecipes: this.recipes,
+        preparedRecipeIds,
         getRecipePlanOptions: (recipe) =>
           this.getRecipePlanOptions(
             recipe,
@@ -1041,6 +1051,7 @@ export class CookbookView extends ItemView {
       },
     );
 	
+    const allItems = resolvedShoppingList.items;
     const items = allItems.filter(
       (item) => !excludedIngredientIds.has(item.ingredient.id),
     );
@@ -1087,6 +1098,26 @@ export class CookbookView extends ItemView {
           void this.toggleRecipeShoppingList(recipe);
         });
       }
+    }
+	
+    this.renderPreparationRecipeOptions(
+      content,
+      resolvedShoppingList.preparationOptions,
+    );
+
+    for (const preparedRecipe of resolvedShoppingList.preparedRecipes) {
+      const recipeRow = recipeList.createDiv("cookbook-shopping-recipe");
+
+      recipeRow.createSpan({
+        text: t("shopping.preparedRecipeTitle", {
+          title: preparedRecipe.recipe.title,
+        }),
+      });
+
+      recipeRow.createEl("small", {
+        cls: "cookbook-shopping-recipe-scale",
+        text: this.getPreparationRecipeScaleDescription(preparedRecipe),
+      });
     }
 
     if (activeStorePlan.marketIds.length > 0) {
@@ -1223,14 +1254,25 @@ export class CookbookView extends ItemView {
       }
 
       const body = formatShoppingEmail(
-        recipes.map((recipe) => ({
-          title: recipe.title,
-          scaleDescription: this.getRecipeScaleDescription(
-            recipe,
-            selectedPeople,
-            activeStorePlan.marketIds,
+        [
+          ...recipes.map((recipe) => ({
+            title: recipe.title,
+            scaleDescription: this.getRecipeScaleDescription(
+              recipe,
+              selectedPeople,
+              activeStorePlan.marketIds,
+            ),
+          })),
+          ...resolvedShoppingList.preparedRecipes.map(
+            (preparedRecipe) => ({
+              title: t("shopping.preparedRecipeTitle", {
+                title: preparedRecipe.recipe.title,
+              }),
+              scaleDescription:
+                this.getPreparationRecipeScaleDescription(preparedRecipe),
+            }),
           ),
-        })),
+        ],
         items,
 		manualItems,
         activeStorePlan.marketIds.map(
@@ -1243,6 +1285,73 @@ export class CookbookView extends ItemView {
         `?subject=${encodeURIComponent(t("shopping.emailSubject"))}` +
         `&body=${encodeURIComponent(body)}`;
     });
+  }
+  
+  private renderPreparationRecipeOptions(
+    parent: HTMLElement,
+    options: Array<{
+      recipe: Recipe;
+      requiredAmount: number;
+      unit: string;
+      scaleFactor: number;
+      sourceRecipeTitles: string[];
+      selected: boolean;
+    }>,
+  ): void {
+    if (options.length === 0) {
+      return;
+    }
+
+    const section = parent.createDiv(
+      "cookbook-shopping-preparation-recipes",
+    );
+
+    section.createEl("strong", {
+      text: t("shopping.preparationRecipes"),
+    });
+
+    for (const option of options) {
+      const label = section.createEl("label", {
+        cls: "cookbook-shopping-preparation-recipe",
+      });
+
+      const checkbox = label.createEl("input", {
+        attr: {
+          type: "checkbox",
+          "aria-label": t("shopping.prepareRecipeAriaLabel", {
+            title: option.recipe.title,
+          }),
+        },
+      });
+
+      checkbox.checked = option.selected;
+
+      const details = label.createDiv(
+        "cookbook-shopping-preparation-recipe-details",
+      );
+
+      details.createEl("strong", {
+        text: option.recipe.title,
+      });
+
+      details.createEl("small", {
+        text: this.getPreparationRecipeScaleDescription(option),
+      });
+
+      if (option.sourceRecipeTitles.length > 0) {
+        details.createEl("small", {
+          text: t("shopping.preparationUsedFor", {
+            recipes: option.sourceRecipeTitles.join(", "),
+          }),
+        });
+      }
+
+      checkbox.addEventListener("change", () => {
+        void this.plugin
+          .setRecipePrepared(option.recipe.id, checkbox.checked)
+          .then(() => this.refreshShoppingList());
+      });
+    }
   }
   
   private renderManualShoppingItems(
@@ -1648,6 +1757,8 @@ export class CookbookView extends ItemView {
         pageEl,
         plan.ingredients,
         this.plugin.settings.showIngredientAllergens,
+        (preparationRecipeId) =>
+          this.openPreparationRecipe(preparationRecipeId),
       );
     }
 
@@ -1664,6 +1775,8 @@ export class CookbookView extends ItemView {
         pageEl,
         currentPage.step.ingredients,
         this.plugin.settings.showIngredientAllergens,
+        (preparationRecipeId) =>
+          this.openPreparationRecipe(preparationRecipeId),
       );
 
       const instructionList = pageEl.createEl("ol", "cookbook-instructions");
@@ -1949,6 +2062,28 @@ export class CookbookView extends ItemView {
   ): string {
     return `recipe:${recipe.id}:step:${stepIndex}`;
   }
+  
+  private openPreparationRecipe(preparationRecipeId: string): void {
+    const recipe = this.recipes.find(
+      (entry) => entry.id === preparationRecipeId,
+    );
+
+    if (!recipe) {
+      this.plugin.notice(
+        t("cooking.preparationRecipeNotFound", {
+          recipeId: preparationRecipeId,
+        }),
+      );
+      return;
+    }
+
+    this.screen = {
+      kind: "cook",
+      recipe,
+      page: 0,
+    };
+    this.render();
+  }
 
   private disposeTimerSubscriptions(): void {
     for (const unsubscribe of this.timerUnsubscribers) {
@@ -2002,6 +2137,10 @@ export class CookbookView extends ItemView {
       relevantRecipes,
       this.library,
       selectedPeople,
+      {
+        allRecipes: this.recipes,
+        preparedRecipeIds: this.plugin.getPreparedRecipeIds(),
+      },
     );
 	
     const excludedIngredientIds = new Set(
@@ -2074,6 +2213,28 @@ export class CookbookView extends ItemView {
 
     return t("shopping.scalingForEaters", {
       count: formatNumber(plan.eaterTotal || recipe.baseEaters),
+    });
+  }
+  
+  private getPreparationRecipeScaleDescription(
+    preparation: {
+      recipe: Recipe;
+      requiredAmount: number;
+      unit: string;
+      scaleFactor: number;
+    },
+  ): string {
+    const produces = preparation.recipe.produces;
+
+    if (!produces) {
+      return "";
+    }
+
+    return t("shopping.preparationScaling", {
+      requiredAmount: formatNumber(preparation.requiredAmount),
+      unit: preparation.unit,
+      yieldAmount: formatNumber(produces.amount),
+      scale: formatNumber(preparation.scaleFactor),
     });
   }
 
@@ -2360,6 +2521,7 @@ function renderIngredientGrid(
   parent: HTMLElement,
   ingredients: ScaledIngredient[],
   showAllergens: boolean,
+  onOpenPreparationRecipe?: (recipeId: string) => void,
 ): void {
   const grid = parent.createDiv("cookbook-ingredient-grid");
 
@@ -2408,6 +2570,17 @@ function renderIngredientGrid(
 
     if (item.note) {
       card.createEl("small", { text: item.note });
+    }
+
+    if (item.preparationRecipeId && onOpenPreparationRecipe) {
+      const preparationButton = card.createEl("button", {
+        cls: "cookbook-ingredient-preparation-link",
+        text: t("cooking.openPreparationRecipe"),
+      });
+
+      preparationButton.addEventListener("click", () => {
+        onOpenPreparationRecipe(item.preparationRecipeId ?? "");
+      });
     }
   }
 }

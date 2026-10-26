@@ -22,6 +22,7 @@ interface IngredientResolution {
 export interface RecipePlanOptions {
   packageStoreIds?: Iterable<string>;
   manualScaleFactor?: number;
+  fixedScaleFactor?: number;
 }
 
 export function findRecipeMatches(
@@ -267,7 +268,14 @@ export function buildRecipePlan(
       ? options.manualScaleFactor
       : undefined;
 
-  const packageAnchor = manualScaleFactor
+  const fixedScaleFactor =
+    options.fixedScaleFactor &&
+    Number.isFinite(options.fixedScaleFactor) &&
+    options.fixedScaleFactor > 0
+      ? options.fixedScaleFactor
+      : undefined;
+
+  const packageAnchor = manualScaleFactor || fixedScaleFactor
     ? undefined
     : findPackageAnchor(
         recipe,
@@ -278,14 +286,15 @@ export function buildRecipePlan(
         options.packageStoreIds,
       );
 
-  const scaleFactor = manualScaleFactor
-    ? manualScaleFactor
-    : packageAnchor
+  const scaleFactor =
+    fixedScaleFactor ??
+    manualScaleFactor ??
+    (packageAnchor
       ? Math.max(
           requestedScaleFactor,
           packageAnchor.resultingScale,
         )
-      : requestedScaleFactor;
+      : requestedScaleFactor);
 
   const scale = (item: RecipeIngredient): ScaledIngredient => {
     const resolved = resolveIngredient(
