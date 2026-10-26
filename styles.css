@@ -5,9 +5,9 @@ id: cooking-navigator
 settings:
   -
     id: cookbook-category-button-size
-    title: Größe der Kategorie-Buttons
+    title: Category button size
     title.de: Größe der Kategorie-Buttons
-    description: Seitenlänge der quadratischen Kategorie-Bilder.
+    description: Side length of square category images.
     description.de: Seitenlänge der quadratischen Kategorie-Bilder.
     type: variable-number-slider
     default: 104
@@ -17,9 +17,9 @@ settings:
     format: px
   -
     id: cookbook-category-button-radius
-    title: Eckenradius der Kategorie-Buttons
+    title: Category button corner radius
     title.de: Eckenradius der Kategorie-Buttons
-    description: Rundung der Kategorie-Bilder.
+    description: Corner rounding of category images.
     description.de: Rundung der Kategorie-Bilder.
     type: variable-number-slider
     default: 12
@@ -29,9 +29,9 @@ settings:
     format: px
   -
     id: cookbook-guest-button-size
-    title: Größe der Gäste-Buttons
+    title: Guest button size
     title.de: Größe der Gäste-Buttons
-    description: Seitenlänge der quadratischen Gäste-Bilder.
+    description: Side length of square guest images.
     description.de: Seitenlänge der quadratischen Gäste-Bilder.
     type: variable-number-slider
     default: 84
@@ -41,9 +41,9 @@ settings:
     format: px
   -
     id: cookbook-guest-button-radius
-    title: Eckenradius der Gäste-Buttons
+    title: Guest button corner radius
     title.de: Eckenradius der Gäste-Buttons
-    description: Rundung der quadratischen Gäste-Bilder.
+    description: Corner rounding of square guest images.
     description.de: Rundung der quadratischen Gäste-Bilder.
     type: variable-number-slider
     default: 12
@@ -53,24 +53,24 @@ settings:
     format: px
   -
     id: cookbook-show-guest-button-chrome
-    title: Gäste-Button-Fläche anzeigen
+    title: Show guest button chrome
     title.de: Gäste-Button-Fläche anzeigen
-    description: Zeigt Hintergrund, Rahmen und Auswahlmarkierung der Gäste-Buttons.
+    description: Show the background, border, and selection indicator on guest buttons.
     description.de: Zeigt Hintergrund, Rahmen und Auswahlmarkierung der Gäste-Buttons.
     default: true
   -
     id: cookbook-show-guest-tooltips
-    title: Gäste-Tooltips anzeigen
+    title: Show guest tooltips
     title.de: Gäste-Tooltips anzeigen
-    description: Zeigt beim Darüberfahren oder Fokussieren den Namen des Gasts.
+    description: Show the guest name when hovering or focusing the button.
     description.de: Zeigt beim Darüberfahren oder Fokussieren den Namen des Gasts.
     type: class-toggle
     default: false
   -
     id: cookbook-recipe-card-width
-    title: Breite der Rezeptkacheln
+    title: Recipe card width
     title.de: Breite der Rezeptkacheln
-    description: Maximale Breite einer Rezeptkachel in der einspaltigen Rezeptliste.
+    description: Maximum card width in the single-column recipe list.
     description.de: Maximale Breite einer Rezeptkachel in der einspaltigen Rezeptliste.
     type: variable-number-slider
     default: 420
@@ -80,9 +80,9 @@ settings:
     format: px
   -
     id: cookbook-recipe-card-min-height
-    title: Mindesthöhe der Rezeptkacheln
+    title: Recipe card minimum height
     title.de: Mindesthöhe der Rezeptkacheln
-    description: Mindesthöhe einer Rezeptkachel. Größere Inhalte dürfen die Kachel weiterhin erweitern.
+    description: Minimum card height. Larger content may still expand the card.
     description.de: Mindesthöhe einer Rezeptkachel. Größere Inhalte dürfen die Kachel weiterhin erweitern.
     type: variable-number-slider
     default: 110
@@ -92,24 +92,24 @@ settings:
     format: px
   -
     id: cookbook-show-category-button-chrome
-    title: Kategorie-Button-Fläche anzeigen
+    title: Show category button chrome
     title.de: Kategorie-Button-Fläche anzeigen
-    description: Zeigt Hintergrund, Rahmen und Markierung des Buttons. Deaktivieren, wenn transparente Bilder ihren eigenen Rahmen mitbringen.
+    description: Show the button background, border, and selection state. Disable this for transparent images with their own frame.
     description.de: Zeigt Hintergrund, Rahmen und Markierung des Buttons. Deaktivieren, wenn transparente Bilder ihren eigenen Rahmen mitbringen.
     default: true
   -
     id: cookbook-show-category-tooltips
-    title: Kategorie-Tooltips anzeigen
+    title: Show category tooltips
     title.de: Kategorie-Tooltips anzeigen
-    description: Zeigt den nativen Obsidian-Tooltip beim Darüberfahren oder Fokussieren an.
+    description: Show Obsidian's native tooltip when hovering or focusing the button.
     description.de: Zeigt den nativen Obsidian-Tooltip beim Darüberfahren oder Fokussieren an.
     type: class-toggle
     default: false
   -
     id: cookbook-alternative-ingredient-color
-    title: Farbe für Zutaten-Alternativen
+    title: Alternative ingredient color
     title.de: Farbe für Zutaten-Alternativen
-    description: Farbton für Zutaten, die wegen einer Avoidance oder Allergie automatisch ersetzt wurden.
+    description: Color used for ingredients automatically replaced due to an avoidance or allergy.
     description.de: Farbton für Zutaten, die wegen einer Avoidance oder Allergie automatisch ersetzt wurden.
     type: variable-color
     format: hex
@@ -117,9 +117,9 @@ settings:
     default: '#4b3566'
   -
     id: cookbook-show-cooking-navigation
-    title: Koch-Navigation unten anzeigen
+    title: Show bottom cooking navigation
     title.de: Koch-Navigation unten anzeigen
-    description: Zeigt die Buttons „Zurück“ und „Weiter“ am unteren Rand des Kochmodus an. Auf Mobilgeräten kann die Navigation stattdessen ausschließlich per Wischgeste erfolgen.
+    description: Show the Previous and Next buttons at the bottom of cooking mode. On mobile devices, swipe navigation can be used instead.
     description.de: Zeigt die Buttons „Zurück“ und „Weiter“ am unteren Rand des Kochmodus an. Auf Mobilgeräten kann die Navigation stattdessen ausschließlich per Wischgeste erfolgen.
     type: class-toggle
     default: true
@@ -206,42 +206,38 @@ settings:
   );
 }
 
-/* Auch auf Tablets die Cookbook-Umgebung möglichst störungsfrei halten. */
-body.cookbook-focus-mode .workspace-ribbon.mod-left,
-body.cookbook-focus-mode .workspace-split.mod-left-split,
-body.cookbook-focus-mode .workspace-tab-header-container {
-  display: none !important;
+:root body.cookbook-focus-mode .workspace-ribbon.mod-left,
+:root body.cookbook-focus-mode .workspace-split.mod-left-split,
+:root body.cookbook-focus-mode .workspace-tab-header-container {
+  display: none;
 }
 
-/* Primäres linkes Ribbon-Menü ausblenden. */
-body.cookbook-focus-mode
+:root body.cookbook-focus-mode
   .workspace-ribbon.side-dock-ribbon.mod-primary {
-  display: none !important;
+  display: none;
 }
 
-/* Desktop-Fenstersteuerung ausblenden, solange Cookbook im Fokusmodus läuft. */
-body.cookbook-focus-mode:not(.is-mobile)
+:root body.cookbook-focus-mode:not(.is-mobile)
   .titlebar-button.mod-minimize,
-body.cookbook-focus-mode:not(.is-mobile)
+:root body.cookbook-focus-mode:not(.is-mobile)
   .titlebar-button.mod-maximize,
-body.cookbook-focus-mode:not(.is-mobile)
+:root body.cookbook-focus-mode:not(.is-mobile)
   .titlebar-button.mod-close {
-  display: none !important;
+  display: none;
 }
 
-/* Statusleiste im Cookbook-Fokusmodus ausblenden. */
-body.cookbook-focus-mode:not(.is-mobile) .status-bar {
-  display: none !important;
+:root body.cookbook-focus-mode:not(.is-mobile) .status-bar {
+  display: none;
 }
 
-body.cookbook-focus-mode:not(.is-mobile)
+:root body.cookbook-focus-mode:not(.is-mobile)
   .workspace-split.mod-left-split
   + .workspace-split-resize-handle {
-  display: none !important;
+  display: none;
 }
 
-body.cookbook-focus-mode.is-mobile .mobile-navbar {
-  display: none !important;
+:root body.cookbook-focus-mode.is-mobile .mobile-navbar {
+  display: none;
 }
 
 .cookbook-allergen-toggle.is-disabled {

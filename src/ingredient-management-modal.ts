@@ -1,5 +1,6 @@
 import { App, Modal, setIcon } from "obsidian";
 import type CookbookPlugin from "./main";
+import { t } from "./i18n";
 import type {
   CookbookLibrary,
   IngredientDefinition,
@@ -52,10 +53,6 @@ export class IngredientManagementModal extends Modal {
     this.restoreScrollPositions(scrollPositions);
   }
   
-  /**
-   * Der Rahmen des Modals bleibt dauerhaft im DOM. Dadurch verschwindet das
-   * Modal bei kleinen Änderungen nicht kurz vollständig aus dem Bild.
-   */
   private ensureModalLayout(): void {
     if (
       this.marketManagementEl &&
@@ -69,13 +66,12 @@ export class IngredientManagementModal extends Modal {
     this.contentEl.addClass("cookbook-ingredient-management-modal");
 
     this.contentEl.createEl("h2", {
-      text: "Zutaten, Orte und Märkte verwalten",
+      text: t("ingredientManagement.title"),
     });
 
     this.contentEl.createEl("p", {
       cls: "setting-item-description",
-      text:
-        "Orte enthalten Supermärkte. Bei Zutaten wird festgelegt, in welchen Supermärkten sie erhältlich sind und welche Packungsgrößen verfügbar sind.",
+      text: t("ingredientManagement.description"),
     });
 
     this.marketManagementEl = this.contentEl.createDiv(
@@ -98,20 +94,17 @@ export class IngredientManagementModal extends Modal {
 
     this.contentEl.empty();
     this.contentEl.addClass("cookbook-ingredient-management-modal");
-    this.contentEl.createEl("h2", { text: "Zutaten verwalten" });
+    this.contentEl.createEl("h2", {
+      text: t("ingredientManagement.errorTitle"),
+    });
     this.contentEl.createEl("p", {
       text:
         error instanceof Error
           ? error.message
-          : "Die Cookbook-Bibliothek konnte nicht geladen werden.",
+          : t("ingredientManagement.libraryLoadError"),
     });
   }
 
-  /**
-   * Aktualisiert alle dynamischen Bereiche, behält aber Kopf und Modal-DOM
-   * stabil. Nötig bei Änderungen an Orten oder Märkten, weil diese auch die
-   * Verfügbarkeitsauswahl jeder Zutat beeinflussen.
-   */
   private refreshAllSections(): void {
     if (
       !this.library ||
@@ -130,11 +123,6 @@ export class IngredientManagementModal extends Modal {
     this.renderAddIngredient(this.addIngredientEl, this.library);
   }
 
-  /**
-   * Zutaten werden wesentlich häufiger bearbeitet als Orte oder Märkte.
-   * Deshalb wird beim Aufklappen, Speichern oder Löschen nur dieser Bereich
-   * aktualisiert.
-   */
   private refreshIngredientManagement(
     scrollPositions = this.captureScrollPositions(),
   ): void {
@@ -175,7 +163,9 @@ export class IngredientManagementModal extends Modal {
     library: CookbookLibrary,
   ): void {
     const section = parent.createDiv("cookbook-management-subsection");
-    section.createEl("h3", { text: "Einkaufsorte" });
+    section.createEl("h3", {
+      text: t("ingredientManagement.locations.heading"),
+    });
 
     const list = section.createDiv("cookbook-management-list");
 
@@ -190,21 +180,25 @@ export class IngredientManagementModal extends Modal {
       row.createEl("small", {
         text:
           storeCount === 1
-            ? "1 Supermarkt"
-            : `${storeCount} Supermärkte`,
+            ? t("ingredientManagement.locations.storeCountOne")
+            : t("ingredientManagement.locations.storeCountMany", {
+                count: storeCount,
+              }),
       });
 
       const remove = this.createIconButton(
         row,
         "trash-2",
-        `${location.name} löschen`,
+        t("ingredientManagement.locations.delete", {
+          name: location.name,
+        }),
       );
 
       remove.disabled = storeCount > 0;
       remove.addEventListener("click", () => {
         if (storeCount > 0) {
           this.plugin.notice(
-            "Ein Ort kann erst gelöscht werden, wenn alle zugehörigen Supermärkte entfernt wurden.",
+            t("ingredientManagement.locations.cannotDelete"),
           );
           return;
         }
@@ -221,20 +215,22 @@ export class IngredientManagementModal extends Modal {
     const nameInput = form.createEl("input", {
       attr: {
         type: "text",
-        placeholder: "z. B. Haselünne",
-        "aria-label": "Name des Einkaufsorts",
+        placeholder: t("ingredientManagement.locations.namePlaceholder"),
+        "aria-label": t("ingredientManagement.locations.nameAriaLabel"),
       },
     });
 
     const addButton = form.createEl("button", {
-      text: "Ort hinzufügen",
+      text: t("ingredientManagement.locations.add"),
     });
 
     addButton.addEventListener("click", () => {
       const name = nameInput.value.trim();
 
       if (!name) {
-        this.plugin.notice("Bitte einen Ortsnamen eingeben.");
+        this.plugin.notice(
+          t("ingredientManagement.locations.nameRequired"),
+        );
         return;
       }
 
@@ -245,7 +241,9 @@ export class IngredientManagementModal extends Modal {
           (location) => location.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
         )
       ) {
-        this.plugin.notice("Dieser Ort ist bereits vorhanden.");
+        this.plugin.notice(
+          t("ingredientManagement.locations.alreadyExists"),
+        );
         return;
       }
 
@@ -281,10 +279,12 @@ export class IngredientManagementModal extends Modal {
       cls: "cookbook-management-collapsible-summary",
     });
 
-    summary.createEl("h3", { text: "Supermärkte" });
+    summary.createEl("h3", {
+      text: t("ingredientManagement.markets.heading"),
+    });
     summary.createSpan({
       cls: "cookbook-management-collapsible-hint",
-      text: "Einträge anzeigen oder ausblenden",
+      text: t("ingredientManagement.markets.toggleHint"),
     });
 
     const content = section.createDiv(
@@ -294,7 +294,9 @@ export class IngredientManagementModal extends Modal {
     this.renderLocationManagement(content, library);
 
     const marketSection = content.createDiv("cookbook-management-subsection");
-    marketSection.createEl("h3", { text: "Supermärkte" });
+    marketSection.createEl("h3", {
+      text: t("ingredientManagement.markets.heading"),
+    });
 
     const locations = library.shoppingLocations ?? [];
     const markets = library.markets ?? [];
@@ -304,7 +306,7 @@ export class IngredientManagementModal extends Modal {
       const row = list.createDiv("cookbook-management-row");
       const locationName =
         locations.find((location) => location.id === market.locationId)?.name ??
-        "Kein Ort";
+        t("ingredientManagement.markets.noLocation");
 
       row.createEl("strong", { text: market.name });
       row.createEl("small", { text: locationName });
@@ -312,7 +314,9 @@ export class IngredientManagementModal extends Modal {
       const remove = this.createIconButton(
         row,
         "trash-2",
-        `${market.name} löschen`,
+        t("ingredientManagement.markets.delete", {
+          name: market.name,
+        }),
       );
 
       remove.addEventListener("click", () => {
@@ -342,7 +346,7 @@ export class IngredientManagementModal extends Modal {
 
     if (locations.length === 0) {
       marketSection.createEl("small", {
-        text: "Lege zuerst mindestens einen Einkaufsort an.",
+        text: t("ingredientManagement.markets.locationRequired"),
       });
       return;
     }
@@ -351,13 +355,15 @@ export class IngredientManagementModal extends Modal {
     const nameInput = form.createEl("input", {
       attr: {
         type: "text",
-        placeholder: "z. B. ALDI",
-        "aria-label": "Name des Supermarkts",
+        placeholder: t("ingredientManagement.markets.namePlaceholder"),
+        "aria-label": t("ingredientManagement.markets.nameAriaLabel"),
       },
     });
 
     const locationSelect = form.createEl("select", {
-      attr: { "aria-label": "Ort des Supermarkts" },
+      attr: {
+        "aria-label": t("ingredientManagement.markets.locationAriaLabel"),
+      },
     });
 
     for (const location of locations) {
@@ -368,14 +374,16 @@ export class IngredientManagementModal extends Modal {
     }
 
     const addButton = form.createEl("button", {
-      text: "Supermarkt hinzufügen",
+      text: t("ingredientManagement.markets.add"),
     });
 
     addButton.addEventListener("click", () => {
       const name = nameInput.value.trim();
 
       if (!name) {
-        this.plugin.notice("Bitte einen Supermarktnamen eingeben.");
+        this.plugin.notice(
+          t("ingredientManagement.markets.nameRequired"),
+        );
         return;
       }
 
@@ -388,7 +396,9 @@ export class IngredientManagementModal extends Modal {
             market.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
         )
       ) {
-        this.plugin.notice("Dieser Supermarkt ist an dem Ort bereits vorhanden.");
+        this.plugin.notice(
+          t("ingredientManagement.markets.alreadyExists"),
+        );
         return;
       }
 
@@ -416,7 +426,9 @@ export class IngredientManagementModal extends Modal {
     const section = parent.createDiv(
       "cookbook-ingredient-management-section",
     );
-    section.createEl("h3", { text: "Zutaten" });
+    section.createEl("h3", {
+      text: t("ingredientManagement.ingredients.heading"),
+    });
 
     const markets = library.markets ?? [];
     const list = section.createDiv("cookbook-ingredient-management-list");
@@ -434,8 +446,12 @@ export class IngredientManagementModal extends Modal {
           tabindex: "0",
           "aria-expanded": String(expanded),
           "aria-label": expanded
-            ? `${ingredient.name} einklappen`
-            : `${ingredient.name} bearbeiten`,
+            ? t("ingredientManagement.ingredients.collapse", {
+                name: ingredient.name,
+              })
+            : t("ingredientManagement.ingredients.edit", {
+                name: ingredient.name,
+              }),
         },
       });
 
@@ -483,39 +499,42 @@ export class IngredientManagementModal extends Modal {
   ): void {
     const editor = parent.createDiv("cookbook-ingredient-editor");
 
-    const nameInput = this.createTextField(editor, "Name", ingredient.name);
+    const nameInput = this.createTextField(
+      editor,
+      t("ingredientManagement.editor.name"),
+      ingredient.name,
+    );
     const singularInput = this.createTextField(
       editor,
-      "Einheit (Singular)",
+      t("ingredientManagement.editor.singularUnit"),
       ingredient.defaultUnit,
     );
     const pluralInput = this.createTextField(
       editor,
-      "Einheit (Plural)",
+      t("ingredientManagement.editor.pluralUnit"),
       ingredient.defaultUnitPlural ?? "",
     );
     const packageInput = this.createTextField(
       editor,
-      "Standard-Packungsgrößen",
+      t("ingredientManagement.editor.packageSizes"),
       (ingredient.packageSizes ?? []).join(", "),
-      "z. B. 200, 400, 500",
+      t("ingredientManagement.editor.packageSizesPlaceholder"),
     );
 	
     editor.createEl("small", {
-      text:
-        "Diese Größen gelten, sofern für einen Supermarkt keine eigene Überschreibung hinterlegt ist.",
+      text: t("ingredientManagement.editor.packageSizesHint"),
     });
 
     const priorityLabel = editor.createEl("label", {
       cls: "cookbook-ingredient-field",
-      text: "Ressourcenpriorität",
+      text: t("ingredientManagement.editor.resourcePriority"),
     });
 
     const prioritySelect = priorityLabel.createEl("select");
     const priorities: Array<[ResourcePriority, string]> = [
-      ["none", "Keine"],
-      ["primary", "Primär"],
-      ["secondary", "Sekundär"],
+      ["none", t("ingredientManagement.editor.priorityNone")],
+      ["primary", t("ingredientManagement.editor.priorityPrimary")],
+      ["secondary", t("ingredientManagement.editor.prioritySecondary")],
     ];
 
     for (const [value, label] of priorities) {
@@ -526,7 +545,7 @@ export class IngredientManagementModal extends Modal {
 
     const availability = editor.createDiv("cookbook-ingredient-availability");
     availability.createEl("small", {
-      text: "In diesen Supermärkten erhältlich",
+      text: t("ingredientManagement.editor.availability"),
     });
 
     const selectedStoreIds = new Set(
@@ -543,7 +562,10 @@ export class IngredientManagementModal extends Modal {
       const checkbox = label.createEl("input", {
         attr: {
           type: "checkbox",
-          "aria-label": `${ingredient.name} ist bei ${market.name} erhältlich`,
+          "aria-label": t("ingredientManagement.editor.availableAtMarket", {
+            ingredient: ingredient.name,
+            market: market.name,
+          }),
         },
       });
 
@@ -554,9 +576,17 @@ export class IngredientManagementModal extends Modal {
         cls: "cookbook-ingredient-store-package-sizes",
         attr: {
           type: "text",
-          placeholder: "Standard",
+          placeholder: t(
+            "ingredientManagement.editor.storePackageSizesPlaceholder",
+          ),
           value: (ingredient.storePackageSizes?.[market.id] ?? []).join(", "),
-          "aria-label": `Packungsgrößen für ${ingredient.name} bei ${market.name}`,
+          "aria-label": t(
+            "ingredientManagement.editor.storePackageSizesAriaLabel",
+            {
+              ingredient: ingredient.name,
+              market: market.name,
+            },
+          ),
         },
       });
 
@@ -577,7 +607,7 @@ export class IngredientManagementModal extends Modal {
     const actions = editor.createDiv("cookbook-ingredient-editor-actions");
 
     const saveButton = actions.createEl("button", {
-      text: "Zutat speichern",
+      text: t("ingredientManagement.editor.save"),
       cls: "mod-cta",
     });
 
@@ -588,13 +618,15 @@ export class IngredientManagementModal extends Modal {
       const packageSizes = parsePackageSizes(packageInput.value);
 
       if (!name || !defaultUnit) {
-        this.plugin.notice("Name und Einheit sind Pflichtfelder.");
+        this.plugin.notice(
+          t("ingredientManagement.editor.nameAndUnitRequired"),
+        );
         return;
       }
 
       if (packageSizes === null) {
         this.plugin.notice(
-          "Packungsgrößen müssen positive Zahlen sein, getrennt durch Kommas.",
+          t("ingredientManagement.editor.invalidPackageSizes"),
         );
         return;
       }
@@ -611,7 +643,9 @@ export class IngredientManagementModal extends Modal {
 
         if (sizes === null) {
           this.plugin.notice(
-            `Ungültige Packungsgrößen für ${market.name}.`,
+            t("ingredientManagement.editor.invalidStorePackageSizes", {
+              market: market.name,
+            }),
           );
           return;
         }
@@ -633,25 +667,20 @@ export class IngredientManagementModal extends Modal {
           ? storePackageSizes
           : undefined;
 
-      /**
-       * [] bedeutet absichtlich: keinem Markt zugeordnet.
-       * undefined bedeutet: in allen Märkten erhältlich.
-       * Nach einer expliziten Checkbox-Auswahl speichern wir immer [] bzw. IDs.
-       */
       ingredient.storeIds = [...selectedStoreIds];
 
       void this.saveAndRefresh("ingredients");
     });
 
     const deleteButton = actions.createEl("button", {
-      text: "Zutat löschen",
+      text: t("ingredientManagement.editor.delete"),
       cls: "mod-warning",
     });
 
     deleteButton.addEventListener("click", () => {
       if (this.isIngredientUsed(ingredient.id)) {
         this.plugin.notice(
-          "Diese Zutat wird noch von mindestens einem Rezept verwendet und kann nicht gelöscht werden.",
+          t("ingredientManagement.editor.cannotDeleteInUse"),
         );
         return;
       }
@@ -677,15 +706,29 @@ export class IngredientManagementModal extends Modal {
     const section = parent.createDiv(
       "cookbook-ingredient-management-section",
     );
-    section.createEl("h3", { text: "Neue Zutat" });
+    section.createEl("h3", {
+      text: t("ingredientManagement.addIngredient.heading"),
+    });
 
     const form = section.createDiv("cookbook-ingredient-add-form");
-    const nameInput = this.createTextField(form, "Name", "");
-    const unitInput = this.createTextField(form, "Einheit", "");
-    const pluralInput = this.createTextField(form, "Plural", "");
+    const nameInput = this.createTextField(
+      form,
+      t("ingredientManagement.addIngredient.name"),
+      "",
+    );
+    const unitInput = this.createTextField(
+      form,
+      t("ingredientManagement.addIngredient.unit"),
+      "",
+    );
+    const pluralInput = this.createTextField(
+      form,
+      t("ingredientManagement.addIngredient.plural"),
+      "",
+    );
 
     const addButton = form.createEl("button", {
-      text: "Zutat hinzufügen",
+      text: t("ingredientManagement.addIngredient.add"),
       cls: "mod-cta",
     });
 
@@ -695,7 +738,9 @@ export class IngredientManagementModal extends Modal {
       const defaultUnitPlural = pluralInput.value.trim();
 
       if (!name || !defaultUnit) {
-        this.plugin.notice("Name und Einheit sind Pflichtfelder.");
+        this.plugin.notice(
+          t("ingredientManagement.editor.nameAndUnitRequired"),
+        );
         return;
       }
 

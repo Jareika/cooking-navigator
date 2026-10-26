@@ -9,6 +9,7 @@ import type {
   RecipePlan,
   ScaledIngredient,
 } from "./types";
+import { t } from "./i18n";
 
 const EPSILON = 0.0001;
 
@@ -107,7 +108,10 @@ function getIngredientDefinition(
 
   if (!ingredient) {
     throw new Error(
-      `Recipe "${recipe.title}" references unknown ingredient "${ingredientId}".`,
+      t("errors.recipeReferencesUnknownIngredient", {
+        title: recipe.title,
+        ingredientId,
+      }),
     );
   }
 
@@ -158,7 +162,10 @@ function getIngredientBlockers(
 
       if (!allergen) {
         throw new Error(
-          `Guest "${person.name}" references unknown allergen "${allergenId}".`,
+          t("errors.guestReferencesUnknownAllergen", {
+            name: person.name,
+            allergenId,
+          }),
         );
       }
 
@@ -226,7 +233,9 @@ function resolveIngredient(
   }
 
   throw new Error(
-    `Recipe "${recipe.title}" is not compatible with the selected guests.`,
+    t("errors.recipeIncompatibleWithGuests", {
+      title: recipe.title,
+    }),
   );
 }
 
@@ -333,7 +342,10 @@ function resolveIngredientAllergens(
 
     if (!allergen) {
       throw new Error(
-        `Ingredient "${ingredient.name}" references unknown allergen "${allergenId}".`,
+        t("errors.ingredientReferencesUnknownAllergen", {
+          name: ingredient.name,
+          allergenId,
+        }),
       );
     }
 
@@ -441,12 +453,6 @@ function getPackageSizesForStores(
     .sort((a, b) => a - b);
 }
 
-/**
- * Finds reachable totals based on package sizes.
- *
- * With [400, 500], reachable values are 400, 500, 800, 900, 1000, ...
- * We deliberately allow combinations, because two 400 g packs are valid.
- */
 function choosePackageAmount(
   requiredAmount: number,
   packageSizes: number[],

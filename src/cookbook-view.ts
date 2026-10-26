@@ -24,6 +24,7 @@ import {
   getResolvedRecipeIngredientIds,
 } from "./shopping-list";
 import type { CookingTimerSnapshot } from "./cooking-timer";
+import { getLocale, t } from "./i18n";
 
 export const COOKBOOK_VIEW_TYPE = "cookbook-browser-view";
 
@@ -58,7 +59,7 @@ export class CookbookView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "Cookbook";
+	return t("app.cookbook");
   }
 
   getIcon(): string {
@@ -91,16 +92,18 @@ export class CookbookView extends ItemView {
     this.containerEl.empty();
 
     const wrapper = this.containerEl.createDiv("cookbook-empty-state");
-    wrapper.createEl("h2", { text: "Cookbook is not configured yet" });
+    wrapper.createEl("h2", {
+      text: t("errors.cookbookNotConfigured"),
+    });
     wrapper.createEl("p", {
       text:
         error instanceof Error
           ? error.message
-          : "Unknown database error.",
+          : t("errors.unknownDatabaseError"),
     });
 
     const createExampleButton = wrapper.createEl("button", {
-      text: "Create example database",
+      text: t("errors.createExampleDatabase"),
       cls: "mod-cta",
     });
 
@@ -109,7 +112,7 @@ export class CookbookView extends ItemView {
     });
 
     const restoreBackupButton = wrapper.createEl("button", {
-      text: "Restore library from backup",
+      text: t("errors.restoreLibraryBackup"),
     });
 
     restoreBackupButton.addEventListener("click", () => {
@@ -172,11 +175,6 @@ export class CookbookView extends ItemView {
     }
   }
   
-  /**
-   * Die View wird für Zustandsänderungen bewusst neu aufgebaut. Damit etwa
-   * beim Abhaken oder Hinzufügen von Einkaufspositionen die Ansicht nicht
-   * wieder an den Anfang springt, wird die Scroll-Position wiederhergestellt.
-   */
   private captureScrollPosition(): {
     containerTop: number;
     rootTop: number;
@@ -226,11 +224,6 @@ export class CookbookView extends ItemView {
     this.renderBrowserRecipeGrid();
   }
  
-  /**
-   * Aktualisiert ausschließlich Filter und Rezeptkarten. Der äußere
-   * Cookbook-Screen bleibt erhalten; dadurch entstehen weder Leerbild noch
-   * ein sichtbarer Scroll-Sprung durch containerEl.empty().
-   */
   private refreshBrowserContent(): void {
     if (
       this.screen.kind !== "browser" ||
@@ -263,7 +256,7 @@ export class CookbookView extends ItemView {
 	
     this.addCategoryButtonLabel(
       allCategoriesButton,
-      "All recipes",
+      t("browser.allRecipes"),
       "cookbook-all-recipes-label",
     );
 
@@ -358,7 +351,7 @@ export class CookbookView extends ItemView {
     if (visibleRecipes.length === 0) {
       grid.createDiv({
         cls: "cookbook-empty-state",
-        text: "No recipes match the selected guests and category.",
+        text: t("browser.noRecipesMatch"),
       });
       return;
     }
@@ -383,11 +376,10 @@ export class CookbookView extends ItemView {
     });
     const content = root.createDiv("cookbook-browser-content");
 
-    content.createEl("h2", { text: "Select guests" });
+    content.createEl("h2", { text: t("guests.title") });
     content.createEl("p", {
       cls: "cookbook-guest-selection-description",
-      text:
-        "Selected guests determine recipe restrictions, favourites, and portion sizes.",
+	  text: t("guests.description"),
     });
 
     this.guestListEl = content.createDiv("cookbook-guest-list");
@@ -396,10 +388,6 @@ export class CookbookView extends ItemView {
     this.renderBrowserActions(root);
   }
 
-  /**
-   * Die Gästeseite bleibt bestehen. Beim Auswählen wird nur die Liste der
-   * Gästekarten aktualisiert, nicht die gesamte ItemView.
-   */
   private refreshGuestList(): void {
     if (this.screen.kind !== "guests" || !this.guestListEl) {
       this.render();
@@ -478,8 +466,8 @@ export class CookbookView extends ItemView {
           "cookbook-close-app-action",
         ],
         attr: {
-          "aria-label": "Obsidian schließen",
-          title: "Obsidian schließen",
+          "aria-label": t("app.closeObsidian"),
+          title: t("app.closeObsidian"),
         },
       });
 
@@ -493,8 +481,8 @@ export class CookbookView extends ItemView {
     const reloadButton = actions.createEl("button", {
       cls: "cookbook-browser-action",
       attr: {
-        "aria-label": "Reload cookbook",
-        title: "Reload cookbook",
+        "aria-label": t("app.reloadCookbook"),
+        title: t("app.reloadCookbook"),
       },
     });
 
@@ -509,12 +497,12 @@ export class CookbookView extends ItemView {
       ],
       attr: {
         "aria-label": isGuestSelection
-          ? "Back to recipe browser"
-          : "Select guests",
+          ? t("actions.backToRecipeBrowser")
+          : t("actions.selectGuests"),
         "aria-pressed": String(isGuestSelection),
         title: isGuestSelection
-          ? "Back to recipe browser"
-          : "Select guests",
+          ? t("actions.backToRecipeBrowser")
+          : t("actions.selectGuests"),
       },
     });
 
@@ -536,12 +524,12 @@ export class CookbookView extends ItemView {
       ],
       attr: {
         "aria-label": isShoppingList
-          ? "Zur Rezeptübersicht"
-          : "Einkaufsliste öffnen",
+          ? t("actions.backToRecipeBrowser")
+          : t("actions.openShoppingList"),
         "aria-pressed": String(isShoppingList),
         title: isShoppingList
-          ? "Zur Rezeptübersicht"
-          : "Einkaufsliste öffnen",
+          ? t("actions.backToRecipeBrowser")
+          : t("actions.openShoppingList"),
       },
     });
 
@@ -563,8 +551,8 @@ export class CookbookView extends ItemView {
           "cookbook-back-to-browser-action",
         ],
         attr: {
-          "aria-label": "Zur Rezeptübersicht",
-          title: "Zur Rezeptübersicht",
+          "aria-label": t("actions.backToRecipeBrowser"),
+          title: t("actions.backToRecipeBrowser"),
         },
       });
 
@@ -584,8 +572,8 @@ export class CookbookView extends ItemView {
             : "",
         ],
         attr: {
-          "aria-label": "Rezept manuell skalieren",
-          title: "Rezept manuell skalieren",
+          "aria-label": t("actions.scaleRecipe"),
+          title: t("actions.scaleRecipe"),
         },
       });
 
@@ -626,8 +614,8 @@ export class CookbookView extends ItemView {
           "cookbook-reset-shopping-planning-action",
         ],
         attr: {
-          "aria-label": "Einkaufsplanung zurücksetzen",
-          title: "Einkaufsplanung zurücksetzen",
+          "aria-label": t("actions.resetShoppingPlanning"),
+          title: t("actions.resetShoppingPlanning"),
         },
       });
 
@@ -644,8 +632,8 @@ export class CookbookView extends ItemView {
         "cookbook-create-recipe-action",
       ],
       attr: {
-        "aria-label": "Neues Rezept erstellen",
-        title: "Neues Rezept erstellen",
+        "aria-label": t("actions.createRecipe"),
+        title: t("actions.createRecipe"),
       },
     });
 
@@ -663,8 +651,8 @@ export class CookbookView extends ItemView {
         "cookbook-manage-ingredients-action",
       ],
       attr: {
-        "aria-label": "Zutaten, Einkaufsorte und Supermärkte verwalten",
-        title: "Zutaten, Einkaufsorte und Supermärkte verwalten",
+        "aria-label": t("actions.manageIngredients"),
+        title: t("actions.manageIngredients"),
       },
     });
 
@@ -676,8 +664,8 @@ export class CookbookView extends ItemView {
     const manageGuestsButton = actions.createEl("button", {
       cls: "cookbook-browser-action",
       attr: {
-        "aria-label": "Manage guests",
-        title: "Manage guests",
+        "aria-label": t("actions.manageGuests"),
+        title: t("actions.manageGuests"),
       },
     });
 
@@ -692,12 +680,12 @@ export class CookbookView extends ItemView {
       ],
       attr: {
         "aria-label": isFocusMode
-          ? "Cookbook-Fokusmodus beenden"
-          : "Cookbook in den Vordergrund bringen",
+          ? t("actions.disableFocusMode")
+          : t("actions.enableFocusMode"),
         "aria-pressed": String(isFocusMode),
         title: isFocusMode
-          ? "Cookbook-Fokusmodus beenden"
-          : "Cookbook in den Vordergrund bringen",
+          ? t("actions.disableFocusMode")
+          : t("actions.enableFocusMode"),
       },
     });
 
@@ -716,8 +704,8 @@ export class CookbookView extends ItemView {
     const settingsButton = actions.createEl("button", {
       cls: "cookbook-browser-action",
       attr: {
-        "aria-label": "Cooking-Navigator-Einstellungen öffnen",
-        title: "Cooking-Navigator-Einstellungen",
+        "aria-label": t("actions.openSettings"),
+        title: t("app.settings"),
       },
     });
 
@@ -736,12 +724,12 @@ export class CookbookView extends ItemView {
       ],
       attr: {
         "aria-label": showAllergens
-          ? "Hide allergen notices"
-          : "Show allergen notices",
+          ? t("actions.hideAllergens")
+          : t("actions.showAllergens"),
         "aria-pressed": String(showAllergens),
         title: showAllergens
-          ? "Hide allergen notices"
-          : "Show allergen notices",
+          ? t("actions.hideAllergens")
+          : t("actions.showAllergens"),
       },
     });
 
@@ -802,14 +790,20 @@ export class CookbookView extends ItemView {
 
     const metadata = card.createDiv("cookbook-recipe-meta");
     const duration = [
-      recipe.prepMinutes ? `${recipe.prepMinutes} min prep` : null,
-      recipe.cookMinutes ? `${recipe.cookMinutes} min cook` : null,
-      recipe.bakeMinutes ? `${recipe.bakeMinutes} min bake` : null,
+      recipe.prepMinutes
+        ? t("browser.preparation", { minutes: recipe.prepMinutes })
+        : null,
+      recipe.cookMinutes
+        ? t("browser.cooking", { minutes: recipe.cookMinutes })
+        : null,
+      recipe.bakeMinutes
+        ? t("browser.baking", { minutes: recipe.bakeMinutes })
+        : null,
     ]
       .filter(Boolean)
       .join(" · ");
 
-    metadata.setText(duration || "No time information");
+    metadata.setText(duration || t("browser.noTimeInformation"));
 
     card.addEventListener("click", () => {
       this.screen = { kind: "cook", recipe, page: 0 };
@@ -824,12 +818,15 @@ export class CookbookView extends ItemView {
       ],
       attr: {
         "aria-label": isInShoppingList
-          ? `${recipe.title} aus der Einkaufsliste entfernen`
-          : `${recipe.title} zur Einkaufsliste hinzufügen`,
+          ? t("shopping.removeRecipe", { title: recipe.title })
+          : t("shopping.addRecipe", { title: recipe.title }),
         title:
           recipeIngredientIds.size > 0
-            ? `${matchingIngredientCount} von ${recipeIngredientIds.size} Zutaten liegen bereits in der Einkaufsliste`
-            : "Keine Zutaten vorhanden",
+            ? t("shopping.recipeIngredientOverlap", {
+                matching: matchingIngredientCount,
+                total: recipeIngredientIds.size,
+              })
+            : t("shopping.noIngredients"),
       },
     });
 
@@ -851,8 +848,12 @@ export class CookbookView extends ItemView {
 
     this.plugin.notice(
       isInShoppingList
-        ? `"${recipe.title}" wurde zur Einkaufsliste hinzugefügt.`
-        : `"${recipe.title}" wurde aus der Einkaufsliste entfernt.`,
+        ? t("notices.recipeAddedToShoppingList", {
+            title: recipe.title,
+          })
+        : t("notices.recipeRemovedFromShoppingList", {
+            title: recipe.title,
+          }),
     );
 
     if (this.screen.kind === "browser") {
@@ -924,12 +925,8 @@ export class CookbookView extends ItemView {
     const content = root.createDiv("cookbook-browser-content");
     this.renderBrowserActions(root);
 
-    content.createEl("h2", { text: "Einkaufsliste" });
+    content.createEl("h2", { text: t("shopping.title") });
 
-    /**
-     * Alles unterhalb der Überschrift ist dynamisch. Der Screen, die
-     * Action-Bar und die Überschrift bleiben bei Änderungen erhalten.
-     */
     this.shoppingContentEl = content.createDiv(
       "cookbook-shopping-dynamic-content",
     );
@@ -937,12 +934,6 @@ export class CookbookView extends ItemView {
     this.renderShoppingListContent();
   }
 
-  /**
-   * Aktualisiert nur den veränderlichen Einkaufslistenbereich.
-   *
-   * Wichtig: Es wird absichtlich nicht this.render() aufgerufen. Dadurch
-   * bleibt .cookbook-root inklusive seiner Scrollposition im DOM erhalten.
-   */
   private refreshShoppingList(): void {
     if (this.screen.kind !== "shopping" || !this.shoppingContentEl) {
       this.render();
@@ -966,18 +957,18 @@ export class CookbookView extends ItemView {
     if (locations.length > 0) {
       const locationField = content.createEl("label", {
         cls: "cookbook-shopping-location-field",
-        text: "Einkaufsort",
+        text: t("shopping.location"),
       });
 
       const locationSelect = locationField.createEl("select", {
         attr: {
-          "aria-label": "Einkaufsort auswählen",
+          "aria-label": t("shopping.selectLocationAriaLabel"),
         },
       });
 
       locationSelect.createEl("option", {
         value: "",
-        text: "Bitte einen Ort auswählen",
+        text: t("shopping.selectLocation"),
       });
 
       for (const location of locations) {
@@ -1003,7 +994,7 @@ export class CookbookView extends ItemView {
     if (recipes.length === 0 && manualItems.length === 0) {
       content.createDiv({
         cls: "cookbook-empty-state",
-        text: "Deine Einkaufsliste ist noch leer.",
+        text: t("shopping.empty"),
       });
       return;
     }
@@ -1011,12 +1002,6 @@ export class CookbookView extends ItemView {
     this.renderManualShoppingItems(content, manualItems);
 
     const selectedPeople = this.getSelectedPeople();
-    /**
-     * Die Marktauswahl hängt nur von der Verfügbarkeit ab, nicht von den
-     * skalierten Mengen. Deshalb wird zunächst eine neutrale Liste erstellt,
-     * daraus der Marktplan bestimmt und anschließend mit den passenden
-     * Markt-Packungsgrößen erneut skaliert.
-     */
     const unscaledItems = buildShoppingList(
       recipes,
       this.library,
@@ -1039,7 +1024,7 @@ export class CookbookView extends ItemView {
       activeUnscaledItems,
       this.library,
       this.plugin.settings.shoppingStoreMode,
-      this.plugin.settings.favoriteStoreId,
+      this.plugin.getFavoriteStoreId(selectedLocationId),
       marketsAtSelectedLocation.map((market) => market.id),
     );
 
@@ -1065,11 +1050,11 @@ export class CookbookView extends ItemView {
     );
 
     const recipeList = content.createDiv("cookbook-shopping-recipes");
-    recipeList.createEl("strong", { text: "Rezepte" });
+    recipeList.createEl("strong", { text: t("shopping.recipes") });
 
     if (recipes.length === 0) {
       recipeList.createEl("small", {
-        text: "Noch keine Rezepte ausgewählt.",
+        text: t("shopping.noRecipesSelected"),
       });
     } else {
       for (const recipe of recipes) {
@@ -1088,8 +1073,12 @@ export class CookbookView extends ItemView {
       const removeButton = recipeRow.createEl("button", {
         cls: "clickable-icon",
         attr: {
-          "aria-label": `${recipe.title} aus der Einkaufsliste entfernen`,
-          title: "Aus Einkaufsliste entfernen",
+          "aria-label": t("shopping.removeRecipe", {
+            title: recipe.title,
+          }),
+          title: t("shopping.removeRecipe", {
+            title: recipe.title,
+          }),
         },
       });
 
@@ -1108,8 +1097,8 @@ export class CookbookView extends ItemView {
       content.createDiv({
         cls: "cookbook-shopping-store-plan",
         text: activeStorePlan.usedFallback
-          ? `Dein Favoritenmarkt reicht nicht aus. Empfohlene Märkte: ${stores}`
-          : `Empfohlene Märkte: ${stores}`,
+          ? t("shopping.favoriteStoreInsufficient", { stores })
+          : t("shopping.recommendedStores", { stores }),
       });
     }
 
@@ -1117,12 +1106,16 @@ export class CookbookView extends ItemView {
       content.createDiv({
         cls: "cookbook-shopping-warning",
         text: selectedLocationId
-          ? `Am gewählten Ort nicht verfügbar oder nicht zugeordnet: ${activeStorePlan.missingIngredients
-              .map((ingredient) => ingredient.name)
-              .join(", ")}`
-          : `Ohne Marktzuordnung: ${activeStorePlan.missingIngredients
-          .map((ingredient) => ingredient.name)
-          .join(", ")}`,
+          ? t("shopping.unavailableAtLocation", {
+              ingredients: activeStorePlan.missingIngredients
+                .map((ingredient) => ingredient.name)
+                .join(", "),
+            })
+          : t("shopping.unavailableWithoutLocation", {
+              ingredients: activeStorePlan.missingIngredients
+                .map((ingredient) => ingredient.name)
+                .join(", "),
+            }),
       });
     }
 
@@ -1139,8 +1132,10 @@ export class CookbookView extends ItemView {
       const removeButton = row.createEl("button", {
         cls: "clickable-icon cookbook-shopping-item-remove",
         attr: {
-          "aria-label": `${item.ingredient.name} als zuhause vorhanden markieren`,
-          title: "Habe ich zuhause",
+          "aria-label": t("shopping.markAsAtHome", {
+            name: item.ingredient.name,
+          }),
+          title: t("shopping.markAsAtHomeTitle"),
         },
       });
 
@@ -1159,7 +1154,7 @@ export class CookbookView extends ItemView {
           .join(", ");
 
         row.createEl("small", {
-          text: marketNames || "Am gewählten Ort nicht verfügbar",
+          text: marketNames || t("shopping.unavailableAtSelectedLocation"),
         });
       }
 
@@ -1181,7 +1176,7 @@ export class CookbookView extends ItemView {
       );
 
       excludedSection.createEl("strong", {
-        text: "Bereits zuhause",
+        text: t("shopping.alreadyAtHome"),
       });
 
       for (const item of excludedItems) {
@@ -1194,7 +1189,7 @@ export class CookbookView extends ItemView {
         });
 
         const restoreButton = row.createEl("button", {
-          text: "Wieder einkaufen",
+          text: t("shopping.buyAgain"),
         });
 
         restoreButton.addEventListener("click", () => {
@@ -1206,7 +1201,7 @@ export class CookbookView extends ItemView {
     }
 
     const emailButton = content.createEl("button", {
-      text: "Einkaufsliste per E-Mail öffnen",
+      text: t("shopping.email"),
       cls: "mod-cta cookbook-shopping-email-button",
     });
 
@@ -1215,7 +1210,7 @@ export class CookbookView extends ItemView {
       content.createEl("small", {
         cls: "cookbook-shopping-email-hint",
         text:
-          "Bitte zuerst unter Einstellungen eine Empfängeradresse für Einkaufslisten hinterlegen.",
+          t("shopping.emailRecipientMissing"),
       });
       return;
     }
@@ -1245,7 +1240,7 @@ export class CookbookView extends ItemView {
 
       window.location.href =
         `mailto:${encodeURIComponent(recipient)}` +
-        `?subject=${encodeURIComponent("Einkaufsliste")}` +
+        `?subject=${encodeURIComponent(t("shopping.emailSubject"))}` +
         `&body=${encodeURIComponent(body)}`;
     });
   }
@@ -1255,15 +1250,15 @@ export class CookbookView extends ItemView {
     manualItems: ManualShoppingItem[],
   ): void {
     const section = parent.createDiv("cookbook-shopping-manual-section");
-    section.createEl("strong", { text: "Manuell hinzufügen" });
+    section.createEl("strong", { text: t("shopping.manual.title") });
 
     const form = section.createDiv("cookbook-shopping-manual-form");
 
     const nameInput = form.createEl("input", {
       attr: {
         type: "text",
-        placeholder: "z. B. Spülmittel",
-        "aria-label": "Artikelname",
+        placeholder: t("shopping.manual.namePlaceholder"),
+        "aria-label": t("shopping.manual.name"),
       },
     });
 
@@ -1272,21 +1267,21 @@ export class CookbookView extends ItemView {
         type: "number",
         min: "0",
         step: "0.1",
-        placeholder: "Menge",
-        "aria-label": "Menge, optional",
+        placeholder: t("shopping.manual.amount"),
+        "aria-label": t("shopping.manual.amount"),
       },
     });
 
     const unitInput = form.createEl("input", {
       attr: {
         type: "text",
-        placeholder: "z. B. Stück",
-        "aria-label": "Einheit, optional",
+        placeholder: t("shopping.manual.unitPlaceholder"),
+        "aria-label": t("shopping.manual.unit"),
       },
     });
 
     const addButton = form.createEl("button", {
-      text: "Hinzufügen",
+      text: t("shopping.manual.add"),
     });
 
     const addManualItem = (): void => {
@@ -1295,7 +1290,7 @@ export class CookbookView extends ItemView {
       const amount = rawAmount ? Number(rawAmount) : undefined;
 
       if (!name) {
-        this.plugin.notice("Bitte gib einen Artikelnamen ein.");
+        this.plugin.notice(t("shopping.manual.nameRequired"));
         return;
       }
 
@@ -1304,7 +1299,7 @@ export class CookbookView extends ItemView {
         (!Number.isFinite(amount) || amount < 0)
       ) {
         this.plugin.notice(
-          "Die Menge muss eine Zahl größer oder gleich null sein.",
+          t("shopping.manual.invalidAmount"),
         );
         return;
       }
@@ -1329,7 +1324,7 @@ export class CookbookView extends ItemView {
     }
 
     const list = section.createDiv("cookbook-shopping-manual-items");
-    list.createEl("strong", { text: "Manuelle Positionen" });
+    list.createEl("strong", { text: t("shopping.manual.items") });
 
     for (const item of manualItems) {
       const row = list.createDiv("cookbook-shopping-manual-item");
@@ -1345,8 +1340,9 @@ export class CookbookView extends ItemView {
       const removeButton = row.createEl("button", {
         cls: "clickable-icon",
         attr: {
-          "aria-label": `${item.name} aus der Einkaufsliste entfernen`,
-          title: "Aus Einkaufsliste entfernen",
+          "aria-label": t("shopping.manual.remove", {
+            name: item.name,
+          }),
         },
       });
 
@@ -1611,7 +1607,7 @@ export class CookbookView extends ItemView {
         image.replaceWith(
           pageEl.createDiv({
             cls: "cookbook-empty-state",
-            text: "Recipe image could not be loaded.",
+            text: t("cooking.imageLoadError"),
           }),
         );
       });
@@ -1622,8 +1618,12 @@ export class CookbookView extends ItemView {
 
       const eaterText =
         plan.eaterTotal > 0
-          ? `For ${formatNumber(plan.eaterTotal)} eater units`
-          : `Base recipe for ${formatNumber(recipe.baseEaters)} eater units`;
+          ? t("cooking.forEaters", {
+              count: formatNumber(plan.eaterTotal),
+            })
+          : t("cooking.baseRecipe", {
+              count: formatNumber(recipe.baseEaters),
+            });
 
       pageEl.createEl("p", {
         cls: "cookbook-subtitle",
@@ -1636,7 +1636,11 @@ export class CookbookView extends ItemView {
       ) {
         pageEl.createDiv({
           cls: "cookbook-package-hint",
-          text: `${plan.packageAnchor.ingredient.name}: scaled to ${formatNumber(plan.packageAnchor.chosenAmount)} ${plan.packageAnchor.ingredient.defaultUnit} because it is a critical resource.`,
+          text: t("cooking.packageHint", {
+            ingredient: plan.packageAnchor.ingredient.name,
+            amount: formatNumber(plan.packageAnchor.chosenAmount),
+            unit: plan.packageAnchor.ingredient.defaultUnit,
+          }),
         });
       }
 
@@ -1649,7 +1653,11 @@ export class CookbookView extends ItemView {
 
     if (currentPage.kind === "step") {
       pageEl.createEl("h1", {
-        text: currentPage.step.title ?? `Step ${currentPage.stepIndex + 1}`,
+        text:
+          currentPage.step.title ??
+          t("cooking.step", {
+            number: currentPage.stepIndex + 1,
+          }),
       });
 
       renderIngredientGrid(
@@ -1668,10 +1676,8 @@ export class CookbookView extends ItemView {
         this.renderCookingTimerControls(
           pageEl,
           this.getCookingTimerId(recipe, currentPage.stepIndex),
-          `${recipe.title}: ${
-            currentPage.step.title ??
-            `Schritt ${currentPage.stepIndex + 1}`
-          }`,
+          `${recipe.title}: ${currentPage.step.title ??
+            t("cooking.step", { number: currentPage.stepIndex + 1 })}`,
           currentPage.step.timerMinutes,
         );
       }
@@ -1682,7 +1688,10 @@ export class CookbookView extends ItemView {
     const footer = cooking.createDiv("cookbook-cooking-footer");
 
     const previous = footer.createEl("button", {
-      text: safePage === 0 ? "Back to browser" : "Previous",
+      text:
+        safePage === 0
+          ? t("cooking.backToBrowser")
+          : t("cooking.previous"),
     });
 
     previous.addEventListener("click", () => {
@@ -1700,7 +1709,10 @@ export class CookbookView extends ItemView {
     });
 
     const next = footer.createEl("button", {
-      text: safePage === pages.length - 1 ? "Finish" : "Next",
+      text:
+        safePage === pages.length - 1
+          ? t("cooking.finish")
+          : t("cooking.next"),
     });
 
     next.addEventListener("click", () => {
@@ -1714,11 +1726,6 @@ export class CookbookView extends ItemView {
     });
   }
   
-  /**
-   * Rendert die Bedienung für den Timer des aktuellen Kochschritts.
-   * Der Controller bleibt dabei außerhalb der View bestehen, sodass der
-   * Timer beim Blättern weiterläuft.
-   */
   private renderCookingTimerControls(
     parent: HTMLElement,
     timerId: string,
@@ -1726,17 +1733,17 @@ export class CookbookView extends ItemView {
     durationMinutes: number,
   ): void {
     const timer = parent.createDiv("cookbook-timer");
-    timer.createEl("strong", { text: "Koch-Timer" });
+    timer.createEl("strong", { text: t("timer.title") });
 
     const status = timer.createDiv("cookbook-timer-status");
     const actions = timer.createDiv("cookbook-timer-actions");
 
     const primaryButton = actions.createEl("button");
     const addMinuteButton = actions.createEl("button", {
-      text: "+1 Min.",
+      text: t("timer.addMinute"),
     });
     const cancelButton = actions.createEl("button", {
-      text: "Abbrechen",
+      text: t("timer.cancel"),
     });
 
     const update = (): void => {
@@ -1787,18 +1794,13 @@ export class CookbookView extends ItemView {
     update();
   }
 
-  /**
-   * Zeigt parallel laufende Timer auch auf anderen Rezeptseiten an. Fertige
-   * Timer erscheinen hier nicht mehr; im ursprünglichen Rezeptschritt bleibt
-   * ihr Status jedoch sichtbar und kann neu gestartet werden.
-   */
   private renderActiveCookingTimers(
     parent: HTMLElement,
     recipe: Recipe,
   ): void {
     const recipeTimerPrefix = `recipe:${recipe.id}:`;
     const panel = parent.createDiv("cookbook-active-timers");
-    panel.createEl("strong", { text: "Aktive Timer" });
+    panel.createEl("strong", { text: t("cooking.activeTimers") });
 
     const list = panel.createDiv("cookbook-active-timer-list");
 
@@ -1832,8 +1834,8 @@ export class CookbookView extends ItemView {
         const actionButton = row.createEl("button", {
           text:
             timer.status === "running"
-              ? "Pausieren"
-              : "Fortsetzen",
+              ? t("timer.pause")
+              : t("timer.resume"),
         });
 
         actionButton.addEventListener("click", () => {
@@ -1847,8 +1849,8 @@ export class CookbookView extends ItemView {
         const addMinuteButton = row.createEl("button", {
           text: "+1",
           attr: {
-            "aria-label": `${timer.label}: eine Minute hinzufügen`,
-            title: "Eine Minute hinzufügen",
+            "aria-label": t("timer.addMinuteToTimer", { label: timer.label }),
+            title: t("timer.addMinuteTitle"),
           },
         });
 
@@ -1857,10 +1859,10 @@ export class CookbookView extends ItemView {
         });
 
         const cancelButton = row.createEl("button", {
-          text: "Abbrechen",
+          text: t("timer.cancel"),
           attr: {
-            "aria-label": `${timer.label} abbrechen`,
-            title: "Timer abbrechen",
+            "aria-label": t("timer.cancelTimer", { label: timer.label }),
+            title: t("timer.cancelTitle"),
           },
         });
 
@@ -1894,14 +1896,14 @@ export class CookbookView extends ItemView {
 
     if (!timer) {
       status.setText(
-        `Bereit: ${formatTimerDuration(
-          Math.round(durationMinutes * 60),
-        )}`,
+        t("timer.ready", {
+          duration: formatTimerDuration(Math.round(durationMinutes * 60)),
+        }),
       );
       primaryButton.setText(
-        `Timer starten · ${formatTimerDuration(
-          Math.round(durationMinutes * 60),
-        )}`,
+        t("timer.start", {
+          duration: formatTimerDuration(Math.round(durationMinutes * 60)),
+        }),
       );
       addMinuteButton.disabled = true;
       cancelButton.disabled = true;
@@ -1911,9 +1913,11 @@ export class CookbookView extends ItemView {
     if (timer.status === "running") {
       container.addClass("is-running");
       status.setText(
-        `Läuft: noch ${formatTimerDuration(timer.remainingSeconds)}`,
+        t("timer.running", {
+          duration: formatTimerDuration(timer.remainingSeconds),
+        }),
       );
-      primaryButton.setText("Pausieren");
+      primaryButton.setText(t("timer.pause"));
       addMinuteButton.disabled = false;
       cancelButton.disabled = false;
       return;
@@ -1922,17 +1926,19 @@ export class CookbookView extends ItemView {
     if (timer.status === "paused") {
       container.addClass("is-paused");
       status.setText(
-        `Pausiert: noch ${formatTimerDuration(timer.remainingSeconds)}`,
+        t("timer.paused", {
+          duration: formatTimerDuration(timer.remainingSeconds),
+        }),
       );
-      primaryButton.setText("Fortsetzen");
+      primaryButton.setText(t("timer.resume"));
       addMinuteButton.disabled = false;
       cancelButton.disabled = false;
       return;
     }
 
     container.addClass("is-finished");
-    status.setText("Timer abgelaufen.");
-    primaryButton.setText("Erneut starten");
+    status.setText(t("timer.finished"));
+    primaryButton.setText(t("timer.restart"));
     addMinuteButton.disabled = true;
     cancelButton.disabled = false;
   }
@@ -1952,10 +1958,6 @@ export class CookbookView extends ItemView {
     this.timerUnsubscribers = [];
   }
   
-  /**
-   * Converts a vault-relative attachment path into a URL that the embedded
-   * browser can load. External image URLs remain unchanged.
-   */
   private resolveImageUrl(imageUrl: string): string {
     return resolveImageUrl(this.app.vault, imageUrl);
   }
@@ -1978,11 +1980,6 @@ export class CookbookView extends ItemView {
     this.render();
   }
   
-  /**
-   * Ermittelt die Märkte, die für genau dieses Rezept gemäß der aktuellen
-   * Ortsauswahl und Marktstrategie relevant sind. Diese Märkte bestimmen,
-   * welche marktspezifischen Packungsgrößen beim Skalieren gelten.
-   */
   private getRecipePackageStoreIds(
     recipe: Recipe,
     selectedPeople: CookbookPerson[],
@@ -2017,7 +2014,7 @@ export class CookbookView extends ItemView {
       ),
       this.library,
       this.plugin.settings.shoppingStoreMode,
-      this.plugin.settings.favoriteStoreId,
+      this.plugin.getFavoriteStoreId(selectedLocationId),
       markets.map((market) => market.id),
     ).marketIds;
   }
@@ -2053,9 +2050,11 @@ export class CookbookView extends ItemView {
           (entry) => entry.id === override.ingredientId,
         )?.name ?? override.ingredientId;
 
-      return `Manuell skaliert über ${ingredient}: ${formatNumber(
-        override.targetAmount,
-      )} ${override.unit}`;
+      return t("shopping.manualScaling", {
+        ingredient,
+        amount: formatNumber(override.targetAmount),
+        unit: override.unit,
+      });
     }
 
     const plan = buildRecipePlan(
@@ -2066,12 +2065,16 @@ export class CookbookView extends ItemView {
     );
 
     if (plan.packageAnchor) {
-      return `Automatisch skaliert über ${plan.packageAnchor.ingredient.name}: ${formatNumber(
-        plan.packageAnchor.chosenAmount,
-      )} ${plan.packageAnchor.ingredient.defaultUnit}`;
+      return t("shopping.automaticScaling", {
+        ingredient: plan.packageAnchor.ingredient.name,
+        amount: formatNumber(plan.packageAnchor.chosenAmount),
+        unit: plan.packageAnchor.ingredient.defaultUnit,
+      });
     }
 
-    return `Skalierung für ${formatNumber(plan.eaterTotal || recipe.baseEaters)} Portionseinheiten`;
+    return t("shopping.scalingForEaters", {
+      count: formatNumber(plan.eaterTotal || recipe.baseEaters),
+    });
   }
 
   private getSelectedPeople(): CookbookPerson[] {
@@ -2082,10 +2085,6 @@ export class CookbookView extends ItemView {
     );
   }
   
-  /**
-   * Stellt die gespeicherte Gästeauswahl wieder her und entfernt dabei IDs,
-   * die inzwischen nicht mehr in der Bibliothek existieren.
-   */
   private restoreSelectedPeople(): void {
     if (!this.library) {
       return;
@@ -2160,17 +2159,10 @@ export class CookbookView extends ItemView {
     this.selectedCategoryId = null;
     this.screen = { kind: "browser" };
 
-    this.plugin.notice("Die Einkaufsplanung wurde zurückgesetzt.");
+    this.plugin.notice(t("notices.shoppingPlanningReset"));
     this.render();
   }
   
-  /**
-   * The visually hidden label keeps category buttons accessible even when
-   * Obsidian's visible native tooltip is disabled.
-   *
-   * Obsidian displays its native black tooltip for aria-label. Therefore it
-   * is only assigned while the Style Settings option is enabled.
-   */
   private addCategoryButtonLabel(
     button: HTMLElement,
     label: string,
@@ -2219,11 +2211,6 @@ export class CookbookView extends ItemView {
     );
   }
   
-  /**
-   * Obsidian Mobile/Themes may force native <button> elements to full width.
-   * A role-button retains keyboard and screen-reader support without being
-   * affected by generic native-button layout rules.
-   */
   private createCategoryButton(
     parent: HTMLElement,
     options: {
@@ -2280,11 +2267,6 @@ export class CookbookView extends ItemView {
     return button;
   }
 
-  /**
-   * Style Settings changes classes on <body>, but does not re-render this
-   * ItemView. Watch for that class change so the native Obsidian tooltip is
-   * added or removed immediately after toggling the setting.
-   */
   private watchStyleSettings(): void {
     this.styleSettingsObserver?.disconnect();
 
@@ -2407,16 +2389,20 @@ function renderIngredientGrid(
     if (item.usesAlternative) {
       card.createEl("small", {
         cls: "cookbook-ingredient-alternative",
-        text: `Alternative für ${item.originalIngredient.name}`,
+        text: t("ingredient.alternativeFor", {
+          name: item.originalIngredient.name,
+        }),
       });
     }
 	
     if (showAllergens && item.allergens.length > 0) {
       card.createEl("small", {
         cls: "cookbook-ingredient-allergens",
-        text: `Contains: ${item.allergens
-          .map((allergen) => allergen.name)
-          .join(", ")}`,
+        text: t("ingredient.contains", {
+          allergens: item.allergens
+            .map((allergen) => allergen.name)
+            .join(", "),
+        }),
       });
     }
 
@@ -2448,7 +2434,7 @@ function initials(name: string): string {
 }
 
 function formatNumber(value: number): string {
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat(getLocale(), {
     maximumFractionDigits: 1,
   }).format(value);
 }
@@ -2473,9 +2459,9 @@ function formatShoppingEmail(
   marketNames: string[],
 ): string {
   const lines = [
-    "Einkaufsliste",
+    t("shopping.emailSubject"),
     "",
-    "Rezepte:",
+    t("shopping.emailRecipes"),
     ...recipes.map(
       (recipe) => `- ${recipe.title} (${recipe.scaleDescription})`,
     ),
@@ -2483,11 +2469,13 @@ function formatShoppingEmail(
   ];
 
   if (marketNames.length > 0) {
-    lines.push(`Empfohlene Märkte: ${marketNames.join(", ")}`, "");
+    lines.push(t("shopping.recommendedStores", {
+      stores: marketNames.join(", "),
+    }), "");
   }
 
   lines.push(
-    "Zutaten:",
+    t("shopping.emailIngredients"),
     ...items.map((item) => {
       const note = item.notes.length > 0 ? ` (${item.notes.join("; ")})` : "";
       return `- ${formatNumber(item.amount)} ${item.unit} ${item.ingredient.name}${note}`;
@@ -2497,7 +2485,7 @@ function formatShoppingEmail(
   if (manualItems.length > 0) {
     lines.push(
       "",
-      "Manuell hinzugefügt:",
+      t("shopping.emailManualItems"),
       ...manualItems.map((item) => {
         const amount = formatManualShoppingItemAmount(item);
         return `- ${amount ? `${amount} ` : ""}${item.name}`;

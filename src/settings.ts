@@ -5,6 +5,7 @@ import {
   type SettingDefinitionItem,
 } from "obsidian";
 import type CookbookPlugin from "./main";
+import { t } from "./i18n";
 
 export class CookbookSettingTab extends PluginSettingTab {
   constructor(
@@ -36,54 +37,68 @@ export class CookbookSettingTab extends PluginSettingTab {
   }
 
   getSettingDefinitions(): SettingDefinitionItem<string>[] {
-    const favoriteStoreOptions: Record<string, string> = {
-      "": "Kein Favorit",
-    };
+    const favoriteStoreSettings = this.plugin
+      .getKnownShoppingLocations()
+      .map((location) => {
+        const options: Record<string, string> = {
+          "": t("settings.shopping.noFavoriteStore"),
+        };
 
-    for (const market of this.plugin.getKnownMarkets(
-      this.plugin.settings.shoppingLocationId,
-    )) {
-      favoriteStoreOptions[market.id] = market.name;
-    }
+        for (const market of this.plugin.getKnownMarkets(location.id)) {
+          options[market.id] = market.name;
+        }
+
+        return {
+          name: location.name,
+          desc: t("settings.shopping.favoriteStoreForLocation", {
+            location: location.name,
+          }),
+          control: {
+            type: "dropdown" as const,
+            key: `favoriteStoreIdsByLocation.${location.id}`,
+            options,
+          },
+        };
+      });
 
     return [
       {
-        name: "Cookbook folder",
-        desc: "Folder containing cookbook-library.json and one or more recipes-*.json files.",
+        name: t("settings.database.folder.name"),
+        desc: t("settings.database.folder.description"),
         control: {
           type: "folder" as const,
           key: "databaseFolder",
           includeRoot: true,
           validate: (value: string) =>
-            value.trim().length > 0 ? undefined : "Please choose a folder.",
+            value.trim().length > 0
+              ? undefined
+              : t("settings.validation.folderRequired"),
         },
       },
       {
-        name: "Default recipe file",
-        desc: "File created when generating the example database.",
+        name: t("settings.database.defaultRecipeFile.name"),
+        desc: t("settings.database.defaultRecipeFile.description"),
         control: {
           type: "text" as const,
           key: "defaultRecipeFile",
-          placeholder: "recipes-main.json",
+          placeholder: t("settings.database.defaultRecipeFile.placeholder"),
           validate: (value: string) =>
             /^recipes-[a-z0-9-]+\.json$/i.test(value.trim())
               ? undefined
-              : 'Use a name such as "recipes-main.json".',
+              : t("settings.validation.defaultRecipeFile"),
         },
       },
       {
-        name: "Create JSON backups",
-        desc:
-          "Erstellt rotierende Sicherungen für JSON-Dateien, die vom Plugin geschrieben werden. Fehlende Bibliotheken können aus der neuesten gültigen Sicherung wiederhergestellt werden.",
+        name: t("settings.database.enableJsonBackups.name"),
+        desc: t("settings.database.enableJsonBackups.description"),
         control: {
           type: "toggle" as const,
           key: "enableJsonBackups",
         },
       },
       {
-        name: "Anzahl der JSON-Sicherungen",
-        desc:
-          "Bei 2 Sicherungen werden die vorherigen Dateistände behalten. Ab 3 Sicherungen wird zusätzlich der aktuell gespeicherte Stand gesichert.",
+        name: t("settings.database.jsonBackupCount.name"),
+        desc: t("settings.database.jsonBackupCount.description"),
         control: {
           type: "slider" as const,
           key: "jsonBackupCount",
@@ -94,9 +109,8 @@ export class CookbookSettingTab extends PluginSettingTab {
         },
       },
       {
-        name: "Cookbook backup folder",
-        desc:
-          "Folder for rotating JSON backups. The recommended default is a Backups folder inside the Cookbook folder.",
+        name: t("settings.database.backupFolder.name"),
+        desc: t("settings.database.backupFolder.description"),
         control: {
           type: "folder" as const,
           key: "backupFolder",
@@ -104,29 +118,28 @@ export class CookbookSettingTab extends PluginSettingTab {
           validate: (value: string) =>
             value.trim().length > 0
               ? undefined
-              : "Please choose a backup folder.",
+              : t("settings.validation.backupFolderRequired"),
         },
       },
       {
-        name: "Show package suggestions",
-        desc: "Show the critical package amount that changed the final recipe scale.",
+        name: t("settings.cooking.showPackageSuggestions.name"),
+        desc: t("settings.cooking.showPackageSuggestions.description"),
         control: {
           type: "toggle" as const,
           key: "showPackageSuggestions",
         },
       },
       {
-        name: "Show allergen notices",
-        desc:
-          "Show declared allergens such as gluten, lactose, or egg below ingredients in cooking mode.",
+        name: t("settings.cooking.showIngredientAllergens.name"),
+        desc: t("settings.cooking.showIngredientAllergens.description"),
         control: {
           type: "toggle" as const,
           key: "showIngredientAllergens",
         },
       },
       {
-        name: "Keep cooking swipes inside Cookbook",
-        desc: "Prevents horizontal swipes in cooking mode from opening Obsidian side panes on touch devices.",
+        name: t("settings.cooking.preventSidePaneSwipes.name"),
+        desc: t("settings.cooking.preventSidePaneSwipes.description"),
         control: {
           type: "toggle" as const,
           key: "preventSidePaneSwipes",
@@ -134,23 +147,21 @@ export class CookbookSettingTab extends PluginSettingTab {
       },
       {
         type: "group" as const,
-        heading: "Koch-Timer",
+        heading: t("settings.timer.heading"),
         items: [
           {
-            name: "Klingelton",
-            desc:
-              "Optionale Sounddatei aus dem Vault. Sie wird abgespielt, wenn ein Koch-Timer abläuft.",
+            name: t("settings.timer.alarmSound.name"),
+            desc: t("settings.timer.alarmSound.description"),
             control: {
               type: "file" as const,
               key: "timerAlarmSoundPath",
-              placeholder: "Sounddatei auswählen…",
+              placeholder: t("settings.timer.alarmSound.placeholder"),
               filter: isAudioFile,
             },
           },
           {
-            name: "Timer-Lautstärke",
-            desc:
-              "Lautstärke des Klingeltons. Bei gesperrten Mobilgeräten kann die Wiedergabe systembedingt eingeschränkt sein.",
+            name: t("settings.timer.alarmVolume.name"),
+            desc: t("settings.timer.alarmVolume.description"),
             control: {
               type: "slider" as const,
               key: "timerAlarmVolume",
@@ -162,48 +173,36 @@ export class CookbookSettingTab extends PluginSettingTab {
         ],
       },
       {
-        name: "Image for “All recipes” button",
-        desc:
-          "Optionally select a square vault image for the first category button in the recipe browser.",
+        name: t("settings.browser.allRecipesImage.name"),
+        desc: t("settings.browser.allRecipesImage.description"),
         control: {
           type: "file" as const,
           key: "allRecipesButtonImagePath",
-          placeholder: "Choose image…",
+          placeholder: t("settings.browser.allRecipesImage.placeholder"),
           filter: isImageFile,
         },
       },
       {
         type: "group" as const,
-        heading: "Einkaufsliste",
+        heading: t("settings.shopping.heading"),
         items: [
           {
-            name: "Marktstrategie",
-            desc:
-              "Legt fest, ob der Favoritenmarkt bevorzugt, die kleinste Markt-Kombination gesucht oder Märkte direkt je Zutat angezeigt werden.",
+            name: t("settings.shopping.storeMode.name"),
+            desc: t("settings.shopping.storeMode.description"),
             control: {
               type: "dropdown" as const,
               key: "shoppingStoreMode",
               options: {
-                "favorite-first": "Favoritenmarkt zuerst",
-                "fewest-stores": "Möglichst wenige Märkte",
-                "ingredient-stores": "Märkte je Zutat anzeigen",
+                "favorite-first": t("settings.shopping.storeMode.favoriteFirst"),
+                "fewest-stores": t("settings.shopping.storeMode.fewestStores"),
+                "ingredient-stores": t("settings.shopping.storeMode.ingredientStores"),
               },
             },
           },
+          ...favoriteStoreSettings,
           {
-            name: "Bevorzugter Markt",
-            desc:
-              "Wird im Modus „Favoritenmarkt zuerst“ verwendet und bei gleich guten Markt-Kombinationen bevorzugt.",
-            control: {
-              type: "dropdown" as const,
-              key: "favoriteStoreId",
-              options: favoriteStoreOptions,
-            },
-          },
-          {
-            name: "Zutaten, Orte und Märkte verwalten",
-            desc:
-              "Verwaltet Zutaten, Packungsgrößen, Einkaufsorte, Supermärkte und die Marktverfügbarkeit einzelner Zutaten.",
+            name: t("settings.shopping.manageIngredients.name"),
+            desc: t("settings.shopping.manageIngredients.description"),
             action: () => {
               this.plugin.openIngredientManagement(() => {
                 void this.plugin.refreshCategoryButtons();
@@ -211,39 +210,36 @@ export class CookbookSettingTab extends PluginSettingTab {
             },
           },
           {
-            name: "Empfänger für Einkaufslisten",
-            desc:
-              "Optional. Der Versand öffnet eine vorbereitete E-Mail in der Standard-Mail-App; das Plugin versendet keine E-Mails selbst.",
+            name: t("settings.shopping.emailRecipient.name"),
+            desc: t("settings.shopping.emailRecipient.description"),
             control: {
               type: "text" as const,
               key: "shoppingListEmailRecipient",
-              placeholder: "name@example.com",
+              placeholder: t("settings.shopping.emailRecipient.placeholder"),
               validate: (value: string) =>
                 value.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
                   ? undefined
-                  : "Bitte eine gültige E-Mail-Adresse eingeben.",
+                  : t("settings.validation.email"),
             },
           },
         ],
       },
       {
         type: "list" as const,
-        heading: "Category buttons",
-        emptyState:
-          "No categories found yet. Create or select a cookbook database first.",
+        heading: t("settings.categoryButtons.heading"),
+        emptyState: t("settings.categoryButtons.emptyState"),
         onReorder: (oldIndex: number, newIndex: number) => {
           void this.reorderCategoryButtons(oldIndex, newIndex);
         },
         items: this.plugin.getOrderedCategories().map(
           ({ category }, index) => ({
             name: category.name,
-            desc:
-              "Drag this row to change the browser order. Optionally select a square category image from the vault.",
+            desc: t("settings.categoryButtons.description"),
             searchable: false,
             control: {
               type: "file" as const,
               key: `categoryButtons.${index}.imagePath`,
-              placeholder: "Choose category image…",
+              placeholder: t("settings.categoryButtons.imagePlaceholder"),
               filter: isImageFile,
             },
           }),
@@ -251,18 +247,18 @@ export class CookbookSettingTab extends PluginSettingTab {
       },
       {
         type: "group" as const,
-        heading: "Database",
+        heading: t("settings.database.actionsHeading"),
         items: [
           {
-            name: "Create example database",
-            desc: "Creates example JSON files if they do not exist yet.",
+            name: t("settings.database.createExample.name"),
+            desc: t("settings.database.createExample.description"),
             action: () => {
               void this.createExampleDatabase();
             },
           },
           {
-            name: "Open cookbook",
-            desc: "Reload the JSON database and open the recipe browser.",
+            name: t("settings.database.openCookbook.name"),
+            desc: t("settings.database.openCookbook.description"),
             action: () => {
               void this.plugin.openCookbook();
             },
@@ -288,7 +284,7 @@ export class CookbookSettingTab extends PluginSettingTab {
 
   private async createExampleDatabase(): Promise<void> {
     await this.plugin.createExampleDatabase();
-    this.plugin.notice("Example cookbook database created.");
+    this.plugin.notice(t("settings.notices.exampleDatabaseCreated"));
   }
 }
 

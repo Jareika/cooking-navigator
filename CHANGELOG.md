@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+- Added optional linked preparation recipes for ingredients, allowing cocktails and other recipes to reference homemade syrups, sauces, doughs, stocks, and similar intermediate products.
+- Shopping planning can optionally replace a referenced product with the correctly scaled ingredients of its preparation recipe.
+- Added built-in English and German UI localization.
+- The Cookbook UI now follows Obsidian's configured interface language via the public `getLanguage()` API, with exact-locale, base-language, and English fallback.
+- Added bundled TypeScript locale catalogs as a maintainable foundation for future community translations.
 - Added a stable in-plugin recipe-creation modal with recipe metadata, shopping-list ingredients, cooking steps, step ingredients, timers, images, categories, restriction scopes, and automatic unique recipe IDs.
 - Added a recipe-creation action to the Cookbook right-side action bar.
 - Added a cancel button for timers in the active-timer overview.

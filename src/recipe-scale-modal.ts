@@ -6,6 +6,7 @@ import type {
   Recipe,
   ScaledIngredient,
 } from "./types";
+import { getLocale, t } from "./i18n";
 
 export class RecipeScaleModal extends Modal {
   private selectedIngredientIndex = 0;
@@ -33,13 +34,12 @@ export class RecipeScaleModal extends Modal {
     this.contentEl.addClass("cookbook-recipe-scale-modal");
 	
     this.contentEl.createEl("h2", {
-      text: `${this.recipe.title} skalieren`,
+      text: t("recipeScale.title", { title: this.recipe.title }),
     });
 
     this.contentEl.createEl("p", {
       cls: "setting-item-description",
-      text:
-        "Wähle eine Hauptzutat und gib die gewünschte Menge ein. Die manuelle Skalierung wird gespeichert und hat Vorrang vor Gäste-, Markt- und Packungsgrößen-Automatik.",
+      text: t("recipeScale.description"),
     });
 
     this.statusEl = this.contentEl.createDiv(
@@ -51,14 +51,14 @@ export class RecipeScaleModal extends Modal {
     );
 
     try {
-      const library = await this.plugin.loadLibrary();
+      await this.plugin.loadLibrary();
       this.libraryLoaded = true;
 
       const override = this.plugin.getRecipeScaleOverride(this.recipe.id);
 
       if (this.recipe.ingredients.length === 0) {
         this.statusEl.createEl("p", {
-          text: "Dieses Rezept enthält keine Hauptzutaten zum Skalieren.",
+          text: t("recipeScale.noIngredients"),
         });
         return;
       }
@@ -78,7 +78,7 @@ export class RecipeScaleModal extends Modal {
         text:
           error instanceof Error
             ? error.message
-            : "Die Rezeptdaten konnten nicht geladen werden.",
+            : t("recipeScale.loadError"),
       });
     }
   }
@@ -147,7 +147,7 @@ export class RecipeScaleModal extends Modal {
         text:
           error instanceof Error
             ? error.message
-            : "Die Rezeptdaten konnten nicht geladen werden.",
+            : t("recipeScale.loadError"),
       });
     } finally {
       window.requestAnimationFrame(() => {
@@ -205,7 +205,9 @@ export class RecipeScaleModal extends Modal {
 
     const valueLabel = editor.createEl("label", {
       cls: "cookbook-recipe-scale-value-field",
-      text: `Gewünschte Menge für ${selectedName}`,
+      text: t("recipeScale.targetAmountFor", {
+        name: selectedName,
+      }),
     });
 
     const amountInput = valueLabel.createEl("input", {
@@ -214,7 +216,9 @@ export class RecipeScaleModal extends Modal {
         min: "0.1",
         step: "0.1",
         value: String(targetAmount),
-        "aria-label": `Gewünschte Menge für ${selectedName}`,
+        "aria-label": t("recipeScale.targetAmountFor", {
+          name: selectedName,
+        }),
       },
     });
 
@@ -223,7 +227,7 @@ export class RecipeScaleModal extends Modal {
     const actions = editor.createDiv("cookbook-recipe-scale-actions");
 
     const saveButton = actions.createEl("button", {
-      text: "Manuelle Skalierung speichern",
+      text: t("recipeScale.saveManual"),
       cls: "mod-cta",
     });
 
@@ -237,7 +241,7 @@ export class RecipeScaleModal extends Modal {
     });
 
     const resetButton = actions.createEl("button", {
-      text: "Automatik verwenden",
+      text: t("recipeScale.useAutomatic"),
     });
 
     resetButton.disabled = !override;
@@ -248,8 +252,7 @@ export class RecipeScaleModal extends Modal {
     if (override) {
       editor.createEl("small", {
         cls: "cookbook-recipe-scale-active-hint",
-        text:
-          "Eine gespeicherte manuelle Skalierung ist aktiv. Gäste, Märkte und Packungsgrößen bestimmen die Menge derzeit nicht automatisch.",
+        text: t("recipeScale.manualScalingActive"),
       });
     }
   }
@@ -267,7 +270,7 @@ export class RecipeScaleModal extends Modal {
       baseAmount <= 0
     ) {
       this.plugin.notice(
-        "Die gewünschte Menge muss größer als null sein.",
+        t("recipeScale.invalidTargetAmount"),
       );
       return;
     }
@@ -280,7 +283,9 @@ export class RecipeScaleModal extends Modal {
     });
 
     this.plugin.notice(
-      `"${this.recipe.title}" wurde manuell skaliert.`,
+      t("recipeScale.saved", {
+        title: this.recipe.title,
+      }),
     );
 
     this.onChanged();
@@ -291,7 +296,9 @@ export class RecipeScaleModal extends Modal {
     await this.plugin.clearRecipeScaleOverride(this.recipe.id);
 
     this.plugin.notice(
-      `Die automatische Skalierung für "${this.recipe.title}" ist wieder aktiv.`,
+      t("recipeScale.automaticRestored", {
+        title: this.recipe.title,
+      }),
     );
 
     this.onChanged();
@@ -311,7 +318,7 @@ function getIngredientUnit(item: ScaledIngredient): string {
 }
 
 function formatNumber(value: number): string {
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat(getLocale(), {
     maximumFractionDigits: 1,
   }).format(value);
 }

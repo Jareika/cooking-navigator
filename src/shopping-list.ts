@@ -65,11 +65,6 @@ export function buildShoppingList(
       const key = `${item.ingredient.id}::${unit}`;
       const existing = items.get(key);
 
-      /**
-       * Fehlende storeIds heißen: Die Zutat ist in jedem konfigurierten Markt
-       * verfügbar. Ein explizit leeres Array heißt hingegen: unbekannt bzw.
-       * noch keinem Markt zugeordnet.
-       */
       const marketIds =
         item.ingredient.storeIds === undefined
           ? allMarketIds
@@ -172,11 +167,6 @@ export function createShoppingStorePlan(
   };
 }
 
-/**
- * Bei üblichen Haushaltslisten sind nur wenige Märkte hinterlegt. Deshalb
- * berechnen wir tatsächlich die kleinste Kombination statt einer bloßen
- * Greedy-Näherung.
- */
 function findSmallestStoreCover(
   marketIds: string[],
   items: ShoppingListItem[],

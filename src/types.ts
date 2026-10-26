@@ -38,10 +38,12 @@ export interface CookbookSettings {
   manualRecipeScaleOverrides: Record<string, RecipeScaleOverride>;
   shoppingStoreMode: ShoppingStoreMode;
   shoppingLocationId?: string;
+  favoriteStoreIdsByLocation: Record<string, string>;
   favoriteStoreId?: string;
   shoppingListEmailRecipient?: string;
   shoppingExcludedIngredientIds: string[];
   manualShoppingItems: ManualShoppingItem[];
+  preparedRecipeIds: string[];
   timerAlarmSoundPath?: string;
   timerAlarmVolume: number;
 }
@@ -75,41 +77,9 @@ export interface IngredientDefinition {
   defaultUnitPlural?: string;
   resourcePriority: ResourcePriority;
   allergenIds?: string[];
-  
-  /**
-   * Märkte, in denen diese Zutat erhältlich ist.
-   *
-   * undefined: in allen konfigurierten Märkten erhältlich
-   * []: noch keinem Markt zugeordnet
-   */
   storeIds?: string[];
-
-  /**
-   * Available package sizes in the ingredient's default unit.
-   * Example for minced meat: [400, 500].
-   */
   packageSizes?: number[];
-  
-  /**
-   * Packungsgrößen je Supermarkt. Ein Eintrag überschreibt für diesen Markt
-   * die allgemeinen packageSizes der Zutat.
-   *
-   * Beispiel:
-   * {
-   *   "aldi-haseluenne": [400],
-   *   "edeka-haseluenne": [200, 500]
-   * }
-   */
   storePackageSizes?: Record<string, number[]>;
-
-  /**
-   * When a calculated amount reaches this ratio of the next possible
-   * package total, the recipe is scaled up to that package total.
-   *
-   * Example: next package total 800 g, threshold 0.75:
-   * - 550 g -> stays at the lower feasible total
-   * - 600 g -> scales up to 800 g
-   */
   packageRoundUpThreshold?: number;
 }
 
@@ -123,14 +93,7 @@ export interface CookbookPerson {
   name: string;
   avatarUrl?: string;
   color: string;
-
-  /**
-   * 1 = one average eater.
-   * 0.5 = half portion.
-   * 1.5 = large portion.
-   */
   eaterWeight: number;
-
   avoidances: PersonAvoidance[];
   intoleranceAllergenIds?: string[];
   favoriteRecipeIds: string[];
@@ -166,6 +129,7 @@ export interface CookbookLibrary {
 
 export interface RecipeIngredient {
   ingredientId: string;
+  preparationRecipeId?: string;
   alternativeIngredientId?: string;
   amount: number;
   unit?: string;
@@ -185,25 +149,18 @@ export interface Recipe {
   id: string;
   title: string;
   categoryIds: string[];
-
-  /**
-   * Number of average eaters for which the base ingredient amounts apply.
-   */
   baseEaters: number;
-
-  /**
-   * A recipe can belong to one or more restriction contexts.
-   * Example: ["cooked"] or ["baking"].
-   */
+  produces?: {
+    ingredientId: string;
+    amount: number;
+    unit?: string;
+  };
   restrictionScopeIds: string[];
-
   imageUrl?: string;
   imagePlacement?: ImagePlacement;
-
   prepMinutes?: number;
   cookMinutes?: number;
   bakeMinutes?: number;
-
   ingredients: RecipeIngredient[];
   steps: RecipeStep[];
 }

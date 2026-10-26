@@ -5,6 +5,7 @@ import type {
   Recipe,
   RecipeDocument,
 } from "./types";
+import { t } from "./i18n";
 
 const LIBRARY_FILE = "cookbook-library.json";
 const RECIPE_FILE_PREFIX = "recipes-";
@@ -44,8 +45,9 @@ export class CookbookDatabase {
 
     if (content === null) {
       throw new Error(
-        `Cookbook library "${this.libraryPath}" was not found. ` +
-          "It was not restored automatically to avoid overwriting data during vault startup.",
+        t("errors.libraryFileMissing", {
+          path: this.libraryPath,
+        }),
       );
     }
 
@@ -77,7 +79,9 @@ export class CookbookDatabase {
 
         if (content === null) {
           throw new Error(
-            `Recipe file "${file.path}" could not be restored.`,
+            t("errors.recipeFileCouldNotBeRead", {
+              path: file.path,
+            }),
           );
         }
 
@@ -107,11 +111,6 @@ export class CookbookDatabase {
     }
   }
 
-  /**
-   * Fügt ein neu erstelltes Rezept zur konfigurierten Standard-Rezeptdatei
-   * hinzu. Existiert diese Datei noch nicht, wird sie als gültiges
-   * RecipeDocument angelegt.
-   */
   async createRecipe(recipe: Recipe): Promise<void> {
     await this.ensureFolder();
 
@@ -130,7 +129,10 @@ export class CookbookDatabase {
 
     if (document.recipes.some((entry) => entry.id === recipe.id)) {
       throw new Error(
-        `A recipe with the ID "${recipe.id}" already exists in "${recipePath}".`,
+        t("errors.recipeIdAlreadyExists", {
+          id: recipe.id,
+          path: recipePath,
+        }),
       );
     }
 
@@ -147,11 +149,6 @@ export class CookbookDatabase {
 
     await this.vault.adapter.write(path, nextContent);
 
-    /**
-     * Ab drei Sicherungen wird zusätzlich der gerade erfolgreich geschriebene
-     * Zustand gesichert. Bei zwei Slots bleibt das bisherige Verhalten:
-     * Es existieren ausschließlich vorherige Dateistände als Sicherung.
-     */
     if (
       this.getSettings().enableJsonBackups &&
       this.backupSlotCount >= 3
@@ -193,14 +190,6 @@ export class CookbookDatabase {
     await this.backupContent(originalPath, currentContent);
   }
 
-  /**
-   * Speichert einen JSON-Stand in einem rotierenden Backup-Slot.
-   *
-   * Wenn der neueste gültige Slot bereits exakt denselben Inhalt enthält,
-   * wird kein Duplikat angelegt. Das verhindert insbesondere bei drei oder
-   * mehr Slots doppelte Einträge: Der vorherige aktuelle Stand wurde bereits
-   * nach seinem letzten Speichervorgang gesichert.
-   */
   private async backupContent(
     originalPath: string,
     content: string,
@@ -253,7 +242,9 @@ export class CookbookDatabase {
     const fileName = originalPath.split("/").pop();
 
     if (!fileName) {
-      throw new Error(`Could not determine file name for "${originalPath}".`);
+      throw new Error(t("errors.backupFileNameCouldNotBeDetermined", {
+        path: originalPath,
+      }));
     }
 
     return Array.from(
@@ -265,11 +256,6 @@ export class CookbookDatabase {
     );
   }
   
-  /**
-   * Settings können auch durch alte oder manuell bearbeitete Daten ungültige
-   * Werte enthalten. Die Datenbank erzwingt daher unabhängig vom UI immer
-   * den erlaubten Bereich von zwei bis fünf Sicherungen.
-   */
   private get backupSlotCount(): number {
     const configuredCount = this.getSettings().jsonBackupCount;
 

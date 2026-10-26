@@ -1,5 +1,6 @@
 import { App, Modal, setIcon } from "obsidian";
 import type CookbookPlugin from "./main";
+import { t } from "./i18n";
 import type {
   CookbookLibrary,
   CookbookPerson,
@@ -51,22 +52,25 @@ export class GuestSettingsModal extends Modal {
     try {
       this.library = await this.plugin.loadLibrary();
     } catch (error) {
-      this.contentEl.createEl("h2", { text: "Guests" });
+      this.contentEl.createEl("h2", {
+        text: t("guestSettings.errorTitle"),
+      });
       this.contentEl.createEl("p", {
         text:
           error instanceof Error
             ? error.message
-            : "The cookbook library could not be loaded.",
+            : t("guestSettings.libraryLoadError"),
       });
       return;
     }
 
-    this.contentEl.createEl("h2", { text: "Manage guests" });
-	this.recipes = await this.plugin.database.loadRecipes();
+    this.contentEl.createEl("h2", {
+      text: t("guestSettings.title"),
+    });
+    this.recipes = await this.plugin.database.loadRecipes();
     this.contentEl.createEl("p", {
       cls: "setting-item-description",
-      text:
-        "Gäste können aufgeklappt bearbeitet werden. Dort lassen sich Bild, Portionsgröße, Allergene und Zutaten-Avoidances verwalten.",
+      text: t("guestSettings.description"),
     });
 
     this.renderGuestList(this.library);
@@ -110,7 +114,7 @@ export class GuestSettingsModal extends Modal {
       const moveUp = this.createIconButton(
         header,
         "chevron-up",
-        `Move ${person.name} up`,
+        t("guestSettings.moveUp", { name: person.name }),
       );
       moveUp.disabled = this.plugin.getGuestButtonIndex(person.id) === 0;
 
@@ -121,7 +125,7 @@ export class GuestSettingsModal extends Modal {
       const moveDown = this.createIconButton(
         header,
         "chevron-down",
-        `Move ${person.name} down`,
+        t("guestSettings.moveDown", { name: person.name }),
       );
       moveDown.disabled =
         this.plugin.getGuestButtonIndex(person.id) >=
@@ -135,8 +139,8 @@ export class GuestSettingsModal extends Modal {
         header,
         expanded ? "chevron-up" : "chevron-down",
         expanded
-          ? `${person.name} einklappen`
-          : `${person.name} bearbeiten`,
+          ? t("guestSettings.collapse", { name: person.name })
+          : t("guestSettings.edit", { name: person.name }),
       );
       toggle.addClass("cookbook-guest-settings-expand-button");
 
@@ -178,7 +182,7 @@ export class GuestSettingsModal extends Modal {
 
     const weightLabel = controls.createEl("label", {
       cls: "cookbook-guest-field",
-      text: "Portionsgröße",
+      text: t("guestSettings.portionSize"),
     });
 
     const eaterWeightInput = weightLabel.createEl("input", {
@@ -187,7 +191,9 @@ export class GuestSettingsModal extends Modal {
         min: "0.1",
         step: "0.1",
         value: String(person.eaterWeight),
-        "aria-label": `Portionsgröße für ${person.name}`,
+        "aria-label": t("guestSettings.portionSizeFor", {
+          name: person.name,
+        }),
       },
     });
 
@@ -197,17 +203,19 @@ export class GuestSettingsModal extends Modal {
 
     const imageLabel = controls.createEl("label", {
       cls: "cookbook-guest-field cookbook-guest-image-field",
-      text: "Bild",
+      text: t("guestSettings.image"),
     });
 
     const imageSelect = imageLabel.createEl("select", {
       attr: {
-        "aria-label": `Bild für ${person.name}`,
+        "aria-label": t("guestSettings.imageFor", {
+          name: person.name,
+        }),
       },
     });
 
     imageSelect.createEl("option", {
-      text: "Kein konfiguriertes Bild",
+      text: t("guestSettings.noConfiguredImage"),
       value: "",
     });
 
@@ -248,7 +256,10 @@ export class GuestSettingsModal extends Modal {
       const input = label.createEl("input", {
         attr: {
           type: "checkbox",
-          "aria-label": `${allergen.name} wird von ${person.name} nicht vertragen`,
+          "aria-label": t("guestSettings.allergenNotTolerated", {
+            allergen: allergen.name,
+            name: person.name,
+          }),
         },
       });
 
@@ -271,7 +282,9 @@ export class GuestSettingsModal extends Modal {
     library: CookbookLibrary,
   ): void {
     const section = parent.createDiv("cookbook-guest-avoidance-controls");
-    section.createEl("small", { text: "Zutaten vermeiden" });
+    section.createEl("small", {
+      text: t("guestSettings.avoidances"),
+    });
 
     const scopeById = new Map(
       library.restrictionScopes.map((scope) => [scope.id, scope]),
@@ -300,7 +313,10 @@ export class GuestSettingsModal extends Modal {
         const remove = this.createIconButton(
           item,
           "x",
-          `${ingredient.name} für ${person.name} wieder erlauben`,
+          t("guestSettings.allowIngredientAgain", {
+            ingredient: ingredient.name,
+            name: person.name,
+          }),
         );
         remove.addClass("cookbook-guest-avoidance-remove");
 
@@ -318,7 +334,9 @@ export class GuestSettingsModal extends Modal {
 
     const scopeSelect = addControls.createEl("select", {
       attr: {
-        "aria-label": `Geltungsbereich für ${person.name}`,
+        "aria-label": t("guestSettings.scopeFor", {
+          name: person.name,
+        }),
       },
     });
 
@@ -331,7 +349,9 @@ export class GuestSettingsModal extends Modal {
 
     const ingredientSelect = addControls.createEl("select", {
       attr: {
-        "aria-label": `Zutat für ${person.name}`,
+        "aria-label": t("guestSettings.ingredientFor", {
+          name: person.name,
+        }),
       },
     });
 
@@ -345,7 +365,7 @@ export class GuestSettingsModal extends Modal {
     }
 
     const add = addControls.createEl("button", {
-      text: "Hinzufügen",
+      text: t("guestSettings.add"),
     });
 
     add.addEventListener("click", () => {
@@ -362,7 +382,7 @@ export class GuestSettingsModal extends Modal {
     eaterWeight: number,
   ): Promise<void> {
     if (!Number.isFinite(eaterWeight) || eaterWeight <= 0) {
-      this.plugin.notice("Die Portionsgröße muss größer als null sein.");
+      this.plugin.notice(t("guestSettings.invalidPortionSize"));
       await this.render();
       return;
     }
@@ -404,7 +424,7 @@ export class GuestSettingsModal extends Modal {
     }
 
     if (avoidance.ingredientIds.includes(ingredientId)) {
-      this.plugin.notice("Diese Zutat ist bereits als Avoidance eingetragen.");
+      this.plugin.notice(t("guestSettings.avoidanceAlreadyExists"));
       return;
     }
 
@@ -443,7 +463,9 @@ export class GuestSettingsModal extends Modal {
     person: CookbookPerson,
   ): void {
     const section = parent.createDiv("cookbook-guest-favorite-controls");
-    section.createEl("small", { text: "Lieblingsrezepte" });
+    section.createEl("small", {
+      text: t("guestSettings.favoriteRecipes"),
+    });
 
     const recipeById = new Map(
       this.recipes.map((recipe) => [recipe.id, recipe]),
@@ -463,7 +485,10 @@ export class GuestSettingsModal extends Modal {
       const remove = this.createIconButton(
         item,
         "x",
-        `${recipe.title} von den Lieblingsrezepten von ${person.name} entfernen`,
+        t("guestSettings.removeFavoriteRecipe", {
+          recipe: recipe.title,
+          name: person.name,
+        }),
       );
       remove.addClass("cookbook-guest-favorite-remove");
 
@@ -475,7 +500,7 @@ export class GuestSettingsModal extends Modal {
     if (this.recipes.length === 0) {
       section.createEl("small", {
         cls: "setting-item-description",
-        text: "Keine Rezepte gefunden.",
+        text: t("guestSettings.noRecipesFound"),
       });
       return;
     }
@@ -488,14 +513,16 @@ export class GuestSettingsModal extends Modal {
 
     if (availableRecipes.length === 0) {
       addControls.createEl("small", {
-        text: "Alle vorhandenen Rezepte sind bereits als Favoriten markiert.",
+        text: t("guestSettings.allRecipesAlreadyFavorites"),
       });
       return;
     }
 
     const recipeSelect = addControls.createEl("select", {
       attr: {
-        "aria-label": `Lieblingsrezept für ${person.name}`,
+        "aria-label": t("guestSettings.favoriteRecipeFor", {
+          name: person.name,
+        }),
       },
     });
 
@@ -507,7 +534,7 @@ export class GuestSettingsModal extends Modal {
     }
 
     const add = addControls.createEl("button", {
-      text: "Hinzufügen",
+      text: t("guestSettings.add"),
     });
 
     add.addEventListener("click", () => {
@@ -520,7 +547,9 @@ export class GuestSettingsModal extends Modal {
     recipeId: string,
   ): Promise<void> {
     if (person.favoriteRecipeIds.includes(recipeId)) {
-      this.plugin.notice("Dieses Rezept ist bereits als Lieblingsrezept eingetragen.");
+      this.plugin.notice(
+        t("guestSettings.favoriteRecipeAlreadyExists"),
+      );
       return;
     }
 
@@ -552,15 +581,17 @@ export class GuestSettingsModal extends Modal {
 
   private renderAddGuestForm(library: CookbookLibrary): void {
     const section = this.contentEl.createDiv("cookbook-add-guest");
-    section.createEl("h3", { text: "Add guest" });
+    section.createEl("h3", {
+      text: t("guestSettings.addGuest"),
+    });
 
     const fields = section.createDiv("cookbook-add-guest-fields");
 
     const nameInput = fields.createEl("input", {
       attr: {
         type: "text",
-        placeholder: "Name",
-        "aria-label": "Guest name",
+        placeholder: t("guestSettings.name"),
+        "aria-label": t("guestSettings.guestName"),
       },
     });
 
@@ -570,7 +601,7 @@ export class GuestSettingsModal extends Modal {
         min: "0.1",
         step: "0.1",
         value: "1",
-        "aria-label": "Eater units",
+        "aria-label": t("guestSettings.portionUnits"),
       },
     });
 
@@ -578,12 +609,12 @@ export class GuestSettingsModal extends Modal {
       attr: {
         type: "color",
         value: getNextGuestColor(library.people),
-        "aria-label": "Guest color",
+        "aria-label": t("guestSettings.guestColor"),
       },
     });
 
     const addButton = fields.createEl("button", {
-      text: "Add guest",
+      text: t("guestSettings.addGuest"),
       cls: "mod-cta",
     });
 
@@ -626,12 +657,12 @@ export class GuestSettingsModal extends Modal {
     const name = rawName.trim();
 
     if (!name) {
-      this.plugin.notice("Please enter a guest name.");
+      this.plugin.notice(t("guestSettings.nameRequired"));
       return;
     }
 
     if (!Number.isFinite(eaterWeight) || eaterWeight <= 0) {
-      this.plugin.notice("Eater units must be greater than zero.");
+      this.plugin.notice(t("guestSettings.invalidPortionSize"));
       return;
     }
 
@@ -652,7 +683,7 @@ export class GuestSettingsModal extends Modal {
 	this.expandedGuestIds.add(person.id);
 
     await this.plugin.saveLibrary(this.library);
-    this.plugin.notice(`Guest "${name}" was added.`);
+    this.plugin.notice(t("guestSettings.guestAdded", { name }));
     this.onChanged();
     await this.render();
   }

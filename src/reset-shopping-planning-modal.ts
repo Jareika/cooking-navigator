@@ -1,4 +1,5 @@
 import { App, Modal } from "obsidian";
+import { t } from "./i18n";
 
 export class ResetShoppingPlanningModal extends Modal {
   private dontAskAgain = false;
@@ -15,13 +16,11 @@ export class ResetShoppingPlanningModal extends Modal {
     this.contentEl.addClass("cookbook-reset-shopping-planning-modal");
 
     this.contentEl.createEl("h2", {
-      text: "Einkaufsplanung zurücksetzen?",
+      text: t("resetShoppingPlanning.title"),
     });
 
     this.contentEl.createEl("p", {
-      text:
-        "Die Einkaufsliste, ausgewählte Gäste, manuelle Skalierungen, " +
-        "als zuhause markierte Zutaten und der Einkaufsort werden gelöscht.",
+      text: t("resetShoppingPlanning.description"),
     });
 
     const checkboxLabel = this.contentEl.createEl("label", {
@@ -35,7 +34,7 @@ export class ResetShoppingPlanningModal extends Modal {
     });
 
     checkboxLabel.createSpan({
-      text: "Nicht erneut nachfragen",
+      text: t("resetShoppingPlanning.dontAskAgain"),
     });
 
     checkbox.addEventListener("change", () => {
@@ -47,7 +46,7 @@ export class ResetShoppingPlanningModal extends Modal {
     );
 
     const cancelButton = actions.createEl("button", {
-      text: "Abbrechen",
+      text: t("resetShoppingPlanning.cancel"),
     });
 
     cancelButton.addEventListener("click", () => {
@@ -55,7 +54,7 @@ export class ResetShoppingPlanningModal extends Modal {
     });
 
     const confirmButton = actions.createEl("button", {
-      text: "Zurücksetzen",
+      text: t("resetShoppingPlanning.confirm"),
       cls: "mod-warning",
     });
 

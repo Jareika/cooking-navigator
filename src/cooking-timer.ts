@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export type CookingTimerStatus = "running" | "paused" | "finished";
 
 export interface CookingTimerSnapshot {
@@ -18,13 +20,6 @@ export interface CookingTimerControllerOptions {
   notice: (message: string) => void;
 }
 
-/**
- * Verwaltet die laufenden Koch-Timer unabhängig von CookbookView.
- *
- * Dadurch bleiben Timer aktiv, wenn zwischen Rezeptseiten gewechselt oder
- * die CookbookView neu gerendert wird. Die Zeit wird über einen absoluten
- * Endzeitpunkt berechnet, nicht über einen bloßen Sekundenzähler.
- */
 export class CookingTimerController {
   private readonly timers = new Map<string, CookingTimer>();
   private readonly listeners = new Set<() => void>();
@@ -56,10 +51,6 @@ export class CookingTimerController {
     };
   }
 
-  /**
-   * Startet einen neuen Timer. Existiert unter derselben ID bereits ein
-   * Timer, wird dieser bewusst mit der vollen Dauer neu gestartet.
-   */
   start(
     id: string,
     label: string,
@@ -165,11 +156,6 @@ export class CookingTimerController {
       return;
     }
 
-    /**
-     * Ein kürzeres Intervall sorgt dafür, dass die Anzeige sauber auf die
-     * nächste Sekunde springt. Die eigentliche Restzeit wird stets anhand
-     * von Date.now() berechnet und driftet daher nicht.
-     */
     this.ticker = window.setInterval(() => {
       this.tick();
     }, 250);
@@ -204,16 +190,16 @@ export class CookingTimerController {
       timer.status = "finished";
       timerFinished = true;
 
-      this.options.notice(`Timer abgelaufen: ${timer.label}`);
+      this.options.notice(
+        t("timer.expiredNotice", {
+          label: timer.label,
+        }),
+      );
       this.playAlarm();
     }
 
     this.stopTickerWhenIdle();
 
-    /**
-     * Auch ohne Ablauf werden Listener benachrichtigt, damit sichtbare
-     * Countdown-Anzeigen jede Sekunde aktualisiert werden können.
-     */
     this.emit();
 
     if (timerFinished) {
@@ -242,12 +228,6 @@ export class CookingTimerController {
     };
   }
 
-  /**
-   * Die Sounddatei wird beim Start bzw. Fortsetzen vorbereitet. Das ist auf
-   * Mobilgeräten hilfreicher als erst beim Ablauf des Timers ein Audioelement
-   * zu erzeugen. Eine garantierte Wiedergabe bei gesperrtem iOS-Gerät kann
-   * ein Obsidian-Plugin dennoch nicht erzwingen.
-   */
   private prepareAlarm(): void {
     const alarmUrl = this.options.getAlarmSoundUrl();
 
@@ -286,18 +266,12 @@ export class CookingTimerController {
       return;
     }
 
-    /**
-     * Ein Klon erlaubt es, dass mehrere fast gleichzeitig ablaufende Timer
-     * ihren Ton jeweils vollständig abspielen können.
-     */
     const audio = this.preparedAlarm.cloneNode(true) as HTMLAudioElement;
     audio.volume = this.getAlarmVolume();
     audio.currentTime = 0;
 
     void audio.play().catch(() => {
-      this.options.notice(
-        "Der Timer ist abgelaufen, aber der Klingelton konnte nicht abgespielt werden.",
-      );
+      this.options.notice(t("timer.soundFailed"));
     });
   }
 

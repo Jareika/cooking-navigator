@@ -6,6 +6,7 @@ import type {
   RecipeIngredient,
   RecipeStep,
 } from "./types";
+import { t } from "./i18n";
 
 const IMAGE_EXTENSIONS = new Set([
   "avif",
@@ -66,11 +67,10 @@ export class RecipeEditorModal extends Modal {
 
     this.contentEl.empty();
     this.contentEl.addClass("cookbook-recipe-editor-modal");
-    this.contentEl.createEl("h2", { text: "Neues Rezept erstellen" });
+    this.contentEl.createEl("h2", { text: t("recipeEditor.title") });
     this.contentEl.createEl("p", {
       cls: "setting-item-description",
-      text:
-        "Lege zuerst die Zutaten für die Einkaufsliste an und ordne sie anschließend optional den einzelnen Kochschritten zu.",
+      text: t("recipeEditor.description"),
     });
 
     this.editorEl = this.contentEl.createDiv(
@@ -82,12 +82,12 @@ export class RecipeEditorModal extends Modal {
     this.editorEl = null;
     this.contentEl.empty();
     this.contentEl.addClass("cookbook-recipe-editor-modal");
-    this.contentEl.createEl("h2", { text: "Rezept erstellen" });
+    this.contentEl.createEl("h2", { text: t("recipeEditor.errorTitle") });
     this.contentEl.createEl("p", {
       text:
         error instanceof Error
           ? error.message
-          : "Die Cookbook-Daten konnten nicht geladen werden.",
+          : t("recipeEditor.loadError"),
     });
   }
 
@@ -115,15 +115,15 @@ export class RecipeEditorModal extends Modal {
     }
 
     const section = parent.createDiv("cookbook-recipe-editor-section");
-    section.createEl("h3", { text: "Grunddaten" });
+    section.createEl("h3", { text: t("recipeEditor.general.heading") });
 
     const fields = section.createDiv("cookbook-recipe-editor-fields");
 
     const titleInput = this.createTextField(
       fields,
-      "Rezeptname",
+      t("recipeEditor.general.recipeName"),
       this.draft.title,
-      "z. B. Kartoffelsuppe",
+      t("recipeEditor.general.recipeNamePlaceholder"),
     );
     titleInput.addEventListener("input", () => {
       this.draft.title = titleInput.value;
@@ -131,7 +131,7 @@ export class RecipeEditorModal extends Modal {
 
     const eatersInput = this.createNumberField(
       fields,
-      "Portionseinheiten",
+      t("recipeEditor.general.eaterUnits"),
       this.draft.baseEaters,
       0.1,
       0.1,
@@ -142,7 +142,7 @@ export class RecipeEditorModal extends Modal {
 
     const prepInput = this.createOptionalNumberField(
       fields,
-      "Vorbereitung (Min.)",
+      t("recipeEditor.general.preparationMinutes"),
       this.draft.prepMinutes,
     );
     prepInput.addEventListener("change", () => {
@@ -151,7 +151,7 @@ export class RecipeEditorModal extends Modal {
 
     const cookInput = this.createOptionalNumberField(
       fields,
-      "Kochen (Min.)",
+      t("recipeEditor.general.cookingMinutes"),
       this.draft.cookMinutes,
     );
     cookInput.addEventListener("change", () => {
@@ -160,7 +160,7 @@ export class RecipeEditorModal extends Modal {
 
     const bakeInput = this.createOptionalNumberField(
       fields,
-      "Backen (Min.)",
+      t("recipeEditor.general.bakingMinutes"),
       this.draft.bakeMinutes,
     );
     bakeInput.addEventListener("change", () => {
@@ -169,12 +169,12 @@ export class RecipeEditorModal extends Modal {
 
     const imageLabel = fields.createEl("label", {
       cls: "cookbook-recipe-editor-field",
-      text: "Rezeptbild",
+      text: t("recipeEditor.general.recipeImage"),
     });
     const imageSelect = imageLabel.createEl("select");
     imageSelect.createEl("option", {
       value: "",
-      text: "Kein Bild",
+      text: t("recipeEditor.general.noImage"),
     });
 
     for (const file of this.imageFiles) {
@@ -191,16 +191,16 @@ export class RecipeEditorModal extends Modal {
 
     const placementLabel = fields.createEl("label", {
       cls: "cookbook-recipe-editor-field",
-      text: "Bildposition",
+      text: t("recipeEditor.general.imagePlacement"),
     });
     const placementSelect = placementLabel.createEl("select");
     placementSelect.createEl("option", {
       value: "cover",
-      text: "Vor den Zutaten",
+      text: t("recipeEditor.general.imageBeforeIngredients"),
     });
     placementSelect.createEl("option", {
       value: "after-ingredients",
-      text: "Nach den Zutaten",
+      text: t("recipeEditor.general.imageAfterIngredients"),
     });
     placementSelect.value = this.draft.imagePlacement ?? "cover";
     placementSelect.addEventListener("change", () => {
@@ -212,7 +212,7 @@ export class RecipeEditorModal extends Modal {
 
     this.renderCheckboxGroup(
       section,
-      "Kategorien",
+      t("recipeEditor.general.categories"),
       this.library.categories.map((category) => ({
         id: category.id,
         name: category.name,
@@ -230,13 +230,13 @@ export class RecipeEditorModal extends Modal {
     const categoryNameInput = addCategory.createEl("input", {
       attr: {
         type: "text",
-        placeholder: "Neue Kategorie, z. B. Aufläufe",
-        "aria-label": "Name der neuen Kategorie",
+        placeholder: t("recipeEditor.categories.placeholder"),
+        "aria-label": t("recipeEditor.categories.nameAriaLabel"),
       },
     });
 
     const addCategoryButton = addCategory.createEl("button", {
-      text: "Kategorie anlegen",
+      text: t("recipeEditor.categories.add"),
     });
 
     const submitCategory = (): void => {
@@ -255,7 +255,7 @@ export class RecipeEditorModal extends Modal {
 
     this.renderCheckboxGroup(
       section,
-      "Einschränkungsbereiche",
+      t("recipeEditor.general.restrictionScopes"),
       this.library.restrictionScopes.map((scope) => ({
         id: scope.id,
         name: scope.name,
@@ -270,10 +270,12 @@ export class RecipeEditorModal extends Modal {
   private renderRecipeIngredients(parent: HTMLElement): void {
     const section = parent.createDiv("cookbook-recipe-editor-section");
     const header = section.createDiv("cookbook-recipe-editor-section-header");
-    header.createEl("h3", { text: "Zutaten für Einkaufsliste" });
+    header.createEl("h3", {
+      text: t("recipeEditor.ingredients.heading"),
+    });
 
     const addButton = header.createEl("button", {
-      text: "Zutat hinzufügen",
+      text: t("recipeEditor.ingredients.add"),
     });
 
     addButton.addEventListener("click", () => {
@@ -289,8 +291,7 @@ export class RecipeEditorModal extends Modal {
 
     section.createEl("small", {
       cls: "setting-item-description",
-      text:
-        "Diese Liste bestimmt die Zutatenübersicht und die Einkaufsliste. Zutaten in Schritten dienen zusätzlich als Kochhilfe.",
+      text: t("recipeEditor.ingredients.description"),
     });
 
     this.renderIngredientList(
@@ -306,10 +307,10 @@ export class RecipeEditorModal extends Modal {
   private renderSteps(parent: HTMLElement): void {
     const section = parent.createDiv("cookbook-recipe-editor-section");
     const header = section.createDiv("cookbook-recipe-editor-section-header");
-    header.createEl("h3", { text: "Kochschritte" });
+    header.createEl("h3", { text: t("recipeEditor.steps.heading") });
 
     const addStepButton = header.createEl("button", {
-      text: "Schritt hinzufügen",
+      text: t("recipeEditor.steps.add"),
     });
 
     addStepButton.addEventListener("click", () => {
@@ -333,12 +334,14 @@ export class RecipeEditorModal extends Modal {
   ): void {
     const card = parent.createDiv("cookbook-recipe-editor-step");
     const header = card.createDiv("cookbook-recipe-editor-step-header");
-    header.createEl("strong", { text: `Schritt ${stepIndex + 1}` });
+    header.createEl("strong", {
+      text: t("recipeEditor.steps.step", { number: stepIndex + 1 }),
+    });
 
     const removeButton = this.createIconButton(
       header,
       "trash-2",
-      `Schritt ${stepIndex + 1} entfernen`,
+      t("recipeEditor.steps.remove", { number: stepIndex + 1 }),
     );
     removeButton.disabled = this.draft.steps.length === 1;
     removeButton.addEventListener("click", () => {
@@ -349,9 +352,9 @@ export class RecipeEditorModal extends Modal {
     const fields = card.createDiv("cookbook-recipe-editor-fields");
     const titleInput = this.createTextField(
       fields,
-      "Überschrift",
+      t("recipeEditor.steps.title"),
       step.title ?? "",
-      `Schritt ${stepIndex + 1}`,
+      t("recipeEditor.steps.step", { number: stepIndex + 1 }),
     );
     titleInput.addEventListener("input", () => {
       step.title = titleInput.value || undefined;
@@ -359,7 +362,7 @@ export class RecipeEditorModal extends Modal {
 
     const timerInput = this.createOptionalNumberField(
       fields,
-      "Timer (Min., optional)",
+      t("recipeEditor.steps.timerMinutes"),
       step.timerMinutes,
     );
     timerInput.addEventListener("change", () => {
@@ -368,12 +371,12 @@ export class RecipeEditorModal extends Modal {
 
     const instructionLabel = card.createEl("label", {
       cls: "cookbook-recipe-editor-field",
-      text: "Anweisungen (eine Zeile = ein Listenpunkt)",
+      text: t("recipeEditor.steps.instructions"),
     });
     const instructionsInput = instructionLabel.createEl("textarea", {
       attr: {
         rows: "5",
-        placeholder: "Zutat vorbereiten\nIm Topf erhitzen\nServieren",
+        placeholder: t("recipeEditor.steps.instructionsPlaceholder"),
       },
     });
     instructionsInput.value = step.instructions.join("\n");
@@ -385,11 +388,11 @@ export class RecipeEditorModal extends Modal {
       "cookbook-recipe-editor-step-ingredients-header",
     );
     ingredientHeader.createEl("strong", {
-      text: "Zutaten in diesem Schritt",
+      text: t("recipeEditor.steps.ingredients"),
     });
 
     const addIngredientButton = ingredientHeader.createEl("button", {
-      text: "Zutat zuordnen",
+      text: t("recipeEditor.steps.assignIngredient"),
     });
     addIngredientButton.addEventListener("click", () => {
       const ingredient = this.createStepIngredient(stepIndex);
@@ -428,7 +431,7 @@ export class RecipeEditorModal extends Modal {
     if (ingredients.length === 0) {
       list.createEl("small", {
         cls: "setting-item-description",
-        text: "Noch keine Zutaten hinzugefügt.",
+        text: t("recipeEditor.ingredients.empty"),
       });
       return;
     }
@@ -443,7 +446,7 @@ export class RecipeEditorModal extends Modal {
 
       const ingredientLabel = fields.createEl("label", {
         cls: "cookbook-recipe-editor-field",
-        text: "Zutat",
+        text: t("recipeEditor.ingredients.ingredient"),
       });
       const ingredientSelect = ingredientLabel.createEl("select");
 
@@ -508,7 +511,7 @@ export class RecipeEditorModal extends Modal {
 
       const amountInput = this.createNumberField(
         fields,
-        "Menge",
+        t("recipeEditor.ingredients.amount"),
         ingredient.amount,
         0.1,
         0.1,
@@ -523,12 +526,12 @@ export class RecipeEditorModal extends Modal {
 
       const alternativeLabel = fields.createEl("label", {
         cls: "cookbook-recipe-editor-field",
-        text: "Alternative",
+        text: t("recipeEditor.ingredients.alternative"),
       });
       const alternativeSelect = alternativeLabel.createEl("select");
       alternativeSelect.createEl("option", {
         value: "",
-        text: "Keine Alternative",
+        text: t("recipeEditor.ingredients.noAlternative"),
       });
 
       for (const definition of ingredientDefinitions) {
@@ -550,9 +553,9 @@ export class RecipeEditorModal extends Modal {
 
       const suffixInput = this.createTextField(
         fields,
-        "Zusatz",
+        t("recipeEditor.ingredients.suffix"),
         ingredient.Suffix ?? "",
-        "z. B. gehackt",
+        t("recipeEditor.ingredients.suffixPlaceholder"),
       );
       suffixInput.addEventListener("input", () => {
         ingredient.Suffix = suffixInput.value.trim() || undefined;
@@ -560,9 +563,9 @@ export class RecipeEditorModal extends Modal {
 
       const noteInput = this.createTextField(
         fields,
-        "Hinweis",
+        t("recipeEditor.ingredients.note"),
         ingredient.note ?? "",
-        "z. B. zum Servieren",
+        t("recipeEditor.ingredients.notePlaceholder"),
       );
       noteInput.addEventListener("input", () => {
         ingredient.note = noteInput.value.trim() || undefined;
@@ -571,7 +574,7 @@ export class RecipeEditorModal extends Modal {
       const removeButton = this.createIconButton(
         row,
         "x",
-        "Zutat entfernen",
+        t("recipeEditor.ingredients.remove"),
       );
       removeButton.addEventListener("click", () => onRemove(index));
     }
@@ -581,12 +584,12 @@ export class RecipeEditorModal extends Modal {
     const actions = parent.createDiv("cookbook-recipe-editor-actions");
 
     const cancelButton = actions.createEl("button", {
-      text: "Abbrechen",
+      text: t("recipeEditor.actions.cancel"),
     });
     cancelButton.addEventListener("click", () => this.close());
 
     const saveButton = actions.createEl("button", {
-      text: "Rezept speichern",
+      text: t("recipeEditor.actions.save"),
       cls: "mod-cta",
     });
     saveButton.addEventListener("click", () => {
@@ -598,7 +601,7 @@ export class RecipeEditorModal extends Modal {
     const title = this.draft.title.trim();
 
     if (!title) {
-      this.plugin.notice("Bitte gib einen Rezeptnamen ein.");
+      this.plugin.notice(t("recipeEditor.validation.nameRequired"));
       return;
     }
 
@@ -606,16 +609,14 @@ export class RecipeEditorModal extends Modal {
       !Number.isFinite(this.draft.baseEaters) ||
       this.draft.baseEaters <= 0
     ) {
-      this.plugin.notice(
-        "Die Portionseinheiten müssen größer als null sein.",
-      );
+      this.plugin.notice(t("recipeEditor.validation.invalidEaterUnits"));
       return;
     }
 
     if (this.draft.ingredients.length === 0) {
-      this.plugin.notice(
-        "Bitte füge mindestens eine Zutat für die Einkaufsliste hinzu.",
-      );
+      this.plugin.notice(t(
+        "recipeEditor.validation.ingredientsRequired",
+      ));
       return;
     }
 
@@ -626,7 +627,7 @@ export class RecipeEditorModal extends Modal {
       )
     ) {
       this.plugin.notice(
-        "Jede Zutat benötigt eine gültige Auswahl und eine Menge größer als null.",
+        t("recipeEditor.validation.invalidIngredient"),
       );
       return;
     }
@@ -644,7 +645,7 @@ export class RecipeEditorModal extends Modal {
       )
     ) {
       this.plugin.notice(
-        "Kochschritte dürfen nur Zutaten verwenden, die dem Rezept zugeordnet wurden.",
+        t("recipeEditor.validation.stepIngredientNotAssigned"),
       );
       return;
     }
@@ -661,7 +662,7 @@ export class RecipeEditorModal extends Modal {
 
     if (steps.length === 0) {
       this.plugin.notice(
-        "Bitte erstelle mindestens einen Kochschritt mit einer Anweisung.",
+        t("recipeEditor.validation.stepsRequired"),
       );
       return;
     }
@@ -680,14 +681,16 @@ export class RecipeEditorModal extends Modal {
 
     try {
       await this.plugin.createRecipe(recipe);
-      this.plugin.notice(`"${recipe.title}" wurde erstellt.`);
+      this.plugin.notice(t("recipeEditor.notices.created", {
+        title: recipe.title,
+      }));
       this.onChanged();
       this.close();
     } catch (error) {
       this.plugin.notice(
         error instanceof Error
           ? error.message
-          : "Das Rezept konnte nicht gespeichert werden.",
+          : t("recipeEditor.saveError"),
       );
     }
   }
@@ -706,7 +709,7 @@ export class RecipeEditorModal extends Modal {
 
     if (!ingredientId) {
       this.plugin.notice(
-        "Lege zuerst im Zutatenmanagement mindestens eine Zutat an.",
+        t("recipeEditor.validation.createIngredientFirst"),
       );
       return null;
     }
@@ -717,11 +720,6 @@ export class RecipeEditorModal extends Modal {
     };
   }
   
-  /**
-   * Zutaten eines Arbeitsschritts werden immer aus der Zutatenliste des
-   * Rezepts übernommen. Die Menge entspricht der noch nicht in vorherigen
-   * Schritten verwendeten Menge.
-   */
   private createStepIngredient(
     stepIndex: number,
   ): RecipeIngredient | null {
@@ -729,7 +727,7 @@ export class RecipeEditorModal extends Modal {
 
     if (!recipeIngredient) {
       this.plugin.notice(
-        "Füge zuerst eine Zutat zur Rezept-Zutatenliste hinzu.",
+        t("recipeEditor.validation.addRecipeIngredientFirst"),
       );
       return null;
     }
@@ -790,7 +788,7 @@ export class RecipeEditorModal extends Modal {
     const name = rawName.trim();
 
     if (!name) {
-      this.plugin.notice("Bitte gib einen Kategorienamen ein.");
+      this.plugin.notice(t("recipeEditor.categories.nameRequired"));
       return;
     }
 
@@ -800,7 +798,7 @@ export class RecipeEditorModal extends Modal {
           category.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
       )
     ) {
-      this.plugin.notice("Diese Kategorie ist bereits vorhanden.");
+      this.plugin.notice(t("recipeEditor.categories.alreadyExists"));
       return;
     }
 
@@ -818,14 +816,14 @@ export class RecipeEditorModal extends Modal {
 
     try {
       await this.plugin.saveLibrary(this.library);
-      this.plugin.notice(`Kategorie "${name}" wurde angelegt.`);
+      this.plugin.notice(t("recipeEditor.categories.created", { name }));
       this.onChanged();
       this.refreshEditor();
     } catch (error) {
       this.plugin.notice(
         error instanceof Error
           ? error.message
-          : "Die Kategorie konnte nicht gespeichert werden.",
+          : t("recipeEditor.categories.saveError"),
       );
     }
   }

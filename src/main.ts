@@ -23,6 +23,7 @@ import type {
 } from "./types";
 import { IngredientManagementModal } from "./ingredient-management-modal";
 import { RecipeEditorModal } from "./recipe-editor-modal";
+import { initializeI18n, t } from "./i18n";
 
 interface ObsidianSettingsView {
   open(): void;
@@ -52,10 +53,12 @@ const DEFAULT_SETTINGS: CookbookSettings = {
   manualRecipeScaleOverrides: {},
   shoppingStoreMode: "favorite-first",
   shoppingLocationId: undefined,
+  favoriteStoreIdsByLocation: {},
   favoriteStoreId: undefined,
   shoppingListEmailRecipient: undefined,
   shoppingExcludedIngredientIds: [],
   manualShoppingItems: [],
+  preparedRecipeIds: [],
   timerAlarmSoundPath: undefined,
   timerAlarmVolume: 0.8,
 };
@@ -215,7 +218,8 @@ export default class CookbookPlugin extends Plugin {
   private knownShoppingLocations: ShoppingLocation[] = [];
 
   async onload(): Promise<void> {
-    await this.loadSettings();
+    initializeI18n();
+	await this.loadSettings();
 	this.applyCookbookFocusMode();
 
     this.database = new CookbookDatabase(
@@ -240,19 +244,19 @@ export default class CookbookPlugin extends Plugin {
       (leaf) => new CookbookView(leaf, this),
     );
 
-    this.addRibbonIcon("cooking-pot", "Open cookbook", () => {
+    this.addRibbonIcon("cooking-pot", t("app.openCookbook"), () => {
       void this.openCookbook();
     });
 
     this.addCommand({
       id: "open-cookbook",
-      name: "Open cookbook",
+      name: t("app.openCookbook"),
       callback: () => void this.openCookbook(),
     });
 
     this.addCommand({
       id: "create-example-database",
-      name: "Create example database",
+      name: t("settings.database.createExample.name"),
       callback: () => void this.createExampleDatabase(),
     });
 
@@ -309,7 +313,9 @@ export default class CookbookPlugin extends Plugin {
     await this.refreshCategoryButtons();
 
     new Notice(
-      `Cookbook files are available in "${this.settings.databaseFolder}".`,
+      t("notices.exampleDatabaseAvailable", {
+        folder: this.settings.databaseFolder,
+      }),
     );
   }
   
@@ -318,7 +324,8 @@ export default class CookbookPlugin extends Plugin {
     await this.syncCategoryButtons(library.categories);
     await this.syncGuestButtons(library.people);
     this.knownMarkets = library.markets ?? [];
-	this.knownShoppingLocations = library.shoppingLocations ?? [];
+    this.knownShoppingLocations = library.shoppingLocations ?? [];
+    await this.migrateLegacyFavoriteStore();
     return library;
   }
 
@@ -350,6 +357,21 @@ export default class CookbookPlugin extends Plugin {
     return this.knownMarkets.filter(
       (market) => market.locationId === locationId,
     );
+  }
+  
+  getFavoriteStoreId(locationId?: string): string | undefined {
+    if (!locationId) {
+      return undefined;
+    }
+
+    const favoriteStoreId =
+      this.settings.favoriteStoreIdsByLocation[locationId];
+
+    return this.getKnownMarkets(locationId).some(
+      (market) => market.id === favoriteStoreId,
+    )
+      ? favoriteStoreId
+      : undefined;
   }
 
   getShoppingRecipeIds(): string[] {
@@ -404,11 +426,6 @@ export default class CookbookPlugin extends Plugin {
     await this.saveSettings();
   }
 
-  /**
-   * Setzt den temporären Einkaufs- und Planungszustand zurück.
-   * Persönliche Einstellungen wie Marktstrategie und Favoritenmarkt bleiben
-   * bewusst erhalten.
-   */
   async resetShoppingPlanning(): Promise<void> {
     this.settings.shoppingRecipeIds = [];
     this.settings.shoppingExcludedIngredientIds = [];
@@ -416,7 +433,32 @@ export default class CookbookPlugin extends Plugin {
     this.settings.manualRecipeScaleOverrides = {};
     this.settings.shoppingLocationId = undefined;
 	this.settings.manualShoppingItems = [];
+	this.settings.preparedRecipeIds = [];
 
+    await this.saveSettings();
+  }
+  
+  getPreparedRecipeIds(): string[] {
+    return [...new Set(this.settings.preparedRecipeIds)];
+  }
+
+  isRecipePrepared(recipeId: string): boolean {
+    return this.settings.preparedRecipeIds.includes(recipeId);
+  }
+
+  async setRecipePrepared(
+    recipeId: string,
+    prepared: boolean,
+  ): Promise<void> {
+    const preparedRecipeIds = new Set(this.getPreparedRecipeIds());
+
+    if (prepared) {
+      preparedRecipeIds.add(recipeId);
+    } else {
+      preparedRecipeIds.delete(recipeId);
+    }
+
+    this.settings.preparedRecipeIds = [...preparedRecipeIds];
     await this.saveSettings();
   }
 
@@ -476,16 +518,6 @@ export default class CookbookPlugin extends Plugin {
   
   async setShoppingLocation(locationId: string | undefined): Promise<void> {
     this.settings.shoppingLocationId = locationId;
-
-    if (
-      this.settings.favoriteStoreId &&
-      locationId &&
-      !this.getKnownMarkets(locationId).some(
-        (market) => market.id === this.settings.favoriteStoreId,
-      )
-    ) {
-      this.settings.favoriteStoreId = undefined;
-    }
 
     await this.saveSettings();
   }
@@ -586,6 +618,50 @@ export default class CookbookPlugin extends Plugin {
       this.settings.shoppingLocationId = undefined;
       await this.saveSettings();
     }
+
+    const validLocationIds = new Set(
+      this.knownShoppingLocations.map((location) => location.id),
+    );
+
+    const nextFavoriteStoreIdsByLocation = Object.fromEntries(
+      Object.entries(this.settings.favoriteStoreIdsByLocation).filter(
+        ([locationId, marketId]) =>
+          validLocationIds.has(locationId) &&
+          this.getKnownMarkets(locationId).some(
+            (market) => market.id === marketId,
+          ),
+      ),
+    );
+
+    if (
+      JSON.stringify(nextFavoriteStoreIdsByLocation) !==
+      JSON.stringify(this.settings.favoriteStoreIdsByLocation)
+    ) {
+      this.settings.favoriteStoreIdsByLocation =
+        nextFavoriteStoreIdsByLocation;
+      await this.saveSettings();
+    }
+  }
+  
+  private async migrateLegacyFavoriteStore(): Promise<void> {
+    const legacyFavoriteStoreId = this.settings.favoriteStoreId;
+
+    if (!legacyFavoriteStoreId) {
+      return;
+    }
+
+    const legacyMarket = this.knownMarkets.find(
+      (market) => market.id === legacyFavoriteStoreId,
+    );
+
+    if (legacyMarket?.locationId) {
+      this.settings.favoriteStoreIdsByLocation[
+        legacyMarket.locationId
+      ] ??= legacyMarket.id;
+    }
+
+    delete this.settings.favoriteStoreId;
+    await this.saveSettings();
   }
 
   async setGuestButtonImage(
@@ -651,8 +727,8 @@ export default class CookbookPlugin extends Plugin {
 
     this.notice(
       restored
-        ? "Die Cookbook-Bibliothek wurde aus dem neuesten gültigen Backup wiederhergestellt."
-        : "Kein gültiges Backup der Cookbook-Bibliothek wurde gefunden.",
+        ? t("notices.libraryRestored")
+        : t("notices.noLibraryBackup"),
     );
 
     return restored;
