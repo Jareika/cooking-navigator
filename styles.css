@@ -1333,7 +1333,7 @@ body:not(.cookbook-show-category-button-chrome)
 }
 
 .cookbook-ingredient-alternative {
-  color: var(--cookbook-alternative-ingredient-color, #4b3566) !important;
+  color: var(--cookbook-alternative-ingredient-color, #4b3566);
   font-weight: 600;
 }
 

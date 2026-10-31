@@ -1,4 +1,4 @@
-Cooking Navigator for Obsidian!
+Cooking Navigator
 
 # No AI readme part (for those of you who care about):
 
