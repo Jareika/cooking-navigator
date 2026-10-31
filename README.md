@@ -36,7 +36,7 @@ If this is still too easy for you:
 Why do I write like this do you ask?
 - Because good things do need a pinch effort.
 
-[![Cooking Navigator Demo]https://youtu.be/y_vmBqQTn-4]
+[![Cooking Navigator Demo](https://youtu.be/y_vmBqQTn-4)]
 
 ---
 
