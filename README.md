@@ -36,6 +36,8 @@ If this is still too easy for you:
 Why do I write like this do you ask?
 - Because good things do need a pinch effort.
 
+[![Cooking Navigator Demo](https://youtu.be/y_vmBqQTn-4)]
+
 ---
 
 # AI readme part (for those of you who care about):
@@ -218,4 +220,537 @@ npm run lint
 - The built-in recipe editor is useful for creating recipes directly in Obsidian, while manual JSON editing remains fully supported.
 - When manually editing the library, make sure IDs remain unique. Ingredient IDs, recipe IDs, category IDs, guest IDs, market IDs, and location IDs are used as references throughout the plugin.
 - The plugin currently supports English and German and follows Obsidian’s configured interface language.
+
+ ---
+ 
+## JSON schema
+
+The following schemas document every currently supported field in
+`cookbook-library.json` and `recipes-*.json`.
+
+They use **JSON Schema Draft 2020-12** and can be used by editors or CI tools
+that support JSON Schema validation.
+
+> [!NOTE]
+> JSON Schema validates structure, data types, and simple value constraints.
+> It cannot fully validate cross-file rules of Cooking Navigator. In
+> particular, make sure manually that:
+>
+> - IDs are unique within their respective collections;
+> - recipe ingredient IDs refer to existing library ingredients;
+> - category, restriction-scope, allergen, location, and market IDs refer to
+>   existing library entries;
+> - `produces.ingredientId` matches the ingredient used by recipes that link
+>   to this recipe through `preparationRecipeId`;
+> - preparation recipes do not form cycles.
+
+### `cookbook-library.json`
+
+```json
+{
+  "title": "Cooking Navigator library",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "categories",
+    "restrictionScopes",
+    "ingredients",
+    "people"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/category"
+      }
+    },
+    "restrictionScopes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/restrictionScope"
+      }
+    },
+    "allergens": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/allergen"
+      }
+    },
+    "shoppingLocations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/shoppingLocation"
+      }
+    },
+    "markets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/market"
+      }
+    },
+    "ingredients": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ingredient"
+      }
+    },
+    "people": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/person"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "color": {
+      "type": "string",
+      "minLength": 1
+    },
+    "positiveNumber": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "category": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "color": {
+          "$ref": "#/$defs/color"
+        }
+      }
+    },
+    "restrictionScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "allergen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "shoppingLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "market": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "locationId": {
+          "$ref": "#/$defs/id"
+        },
+        "color": {
+          "$ref": "#/$defs/color"
+        }
+      }
+    },
+    "ingredient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "defaultUnit",
+        "resourcePriority"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "defaultUnit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "defaultUnitPlural": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resourcePriority": {
+          "enum": [
+            "none",
+            "primary",
+            "secondary"
+          ]
+        },
+        "allergenIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "storeIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "packageSizes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/positiveNumber"
+          }
+        },
+        "storePackageSizes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/positiveNumber"
+            }
+          }
+        },
+        "packageRoundUpThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "avoidance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scopeId",
+        "ingredientIds"
+      ],
+      "properties": {
+        "scopeId": {
+          "$ref": "#/$defs/id"
+        },
+        "ingredientIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      }
+    },
+    "person": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "color",
+        "eaterWeight",
+        "avoidances",
+        "favoriteRecipeIds"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "avatarUrl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "color": {
+          "$ref": "#/$defs/color"
+        },
+        "eaterWeight": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "avoidances": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/avoidance"
+          }
+        },
+        "intoleranceAllergenIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "favoriteRecipeIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      }
+    }
+  }
+}
 ```
+
+### `recipes-*.json`
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Cooking Navigator recipe document",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "recipes"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "recipes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/recipe"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "positiveNumber": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "ingredient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ingredientId",
+        "amount"
+      ],
+      "properties": {
+        "ingredientId": {
+          "$ref": "#/$defs/id"
+        },
+        "preparationRecipeId": {
+          "$ref": "#/$defs/id"
+        },
+        "alternativeIngredientId": {
+          "$ref": "#/$defs/id"
+        },
+        "amount": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unitPlural": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Suffix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Recipe-specific text appended to the ingredient name."
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ingredients",
+        "instructions"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ingredients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ingredient"
+          }
+        },
+        "instructions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "timerMinutes": {
+          "$ref": "#/$defs/positiveNumber"
+        }
+      }
+    },
+    "produces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ingredientId",
+        "amount"
+      ],
+      "properties": {
+        "ingredientId": {
+          "$ref": "#/$defs/id"
+        },
+        "amount": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "categoryIds",
+        "baseEaters",
+        "restrictionScopeIds",
+        "ingredients",
+        "steps"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "categoryIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "baseEaters": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "produces": {
+          "$ref": "#/$defs/produces"
+        },
+        "restrictionScopeIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "imageUrl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "imagePlacement": {
+          "enum": [
+            "cover",
+            "after-ingredients"
+          ]
+        },
+        "prepMinutes": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "cookMinutes": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "bakeMinutes": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "ingredients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ingredient"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+`Suffix` intentionally starts with an uppercase `S` because this is the
+existing JSON field name used by Cooking Navigator. It is kept for backwards
+compatibility.
+
+---
