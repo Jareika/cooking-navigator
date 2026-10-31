@@ -140,6 +140,12 @@ settings:
   gap: 1rem;
 }
 
+.cookbook-recipe-browser-screen {
+  box-sizing: border-box;
+  overflow: hidden;
+  align-items: stretch;
+}
+
 .cookbook-cooking-screen {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -149,6 +155,11 @@ settings:
 
 .cookbook-browser-content {
   min-width: 0;
+}
+
+.cookbook-recipe-browser-screen .cookbook-browser-content {
+  min-height: 0;
+  height: 100%;
 }
 
 .cookbook-cooking {
@@ -263,6 +274,12 @@ settings:
   gap: 1rem;
 }
 
+.cookbook-recipe-browser-screen .cookbook-browser-layout {
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+}
+
 .cookbook-recipe-grid {
   display: grid;
   grid-template-columns:
@@ -270,6 +287,14 @@ settings:
   align-content: start;
   justify-content: start;
   gap: 0.75rem;
+}
+
+.cookbook-recipe-browser-screen .cookbook-category-list,
+.cookbook-recipe-browser-screen .cookbook-recipe-grid {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .cookbook-recipe-card-row {
@@ -761,6 +786,7 @@ settings:
 }
 
 .cookbook-guest-card {
+  position: relative;
   display: grid;
   width: var(--cookbook-guest-button-size, 84px);
   height: var(--cookbook-guest-button-size, 84px);
@@ -781,8 +807,26 @@ settings:
 
 .cookbook-guest-card.is-selected {
   border-color: var(--person-color);
+  background: color-mix(
+    in srgb,
+    var(--person-color) 18%,
+    var(--background-secondary)
+  );
   box-shadow: 0 0 0 3px
-    color-mix(in srgb, var(--person-color) 30%, transparent);
+    color-mix(in srgb, var(--person-color) 25%, transparent);
+}
+
+.cookbook-guest-card.is-selected::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: color-mix(
+    in srgb,
+    var(--person-color) 14%,
+    var(--background-secondary-alt)
+  );
 }
 
 .cookbook-guest-card:focus-visible {
@@ -791,26 +835,18 @@ settings:
 }
 
 .cookbook-guest-button-image {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.cookbook-guest-card.is-selected .cookbook-guest-button-image {
-  filter:
-    drop-shadow(2px 0 0 #d4af37)
-    drop-shadow(-2px 0 0 #d4af37)
-    drop-shadow(0 2px 0 #d4af37)
-    drop-shadow(0 -2px 0 #d4af37)
-    drop-shadow(1.5px 1.5px 0 #d4af37)
-    drop-shadow(-1.5px -1.5px 0 #d4af37)
-    drop-shadow(1.5px -1.5px 0 #d4af37)
-    drop-shadow(-1.5px 1.5px 0 #d4af37);
-}
-
 .cookbook-guest-button-initials,
 .cookbook-guest-settings-preview {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
   background: color-mix(in srgb, var(--person-color) 75%, transparent);
@@ -1139,6 +1175,10 @@ body:not(.cookbook-show-guest-button-chrome)
   cursor: pointer;
 }
 
+.cookbook-all-recipes-category-button.is-at-end {
+  order: 1;
+}
+
 .cookbook-category-button[role="button"]:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 3px;
@@ -1192,23 +1232,23 @@ body:not(.cookbook-show-guest-button-chrome)
 }
 
 body:not(.cookbook-show-category-button-chrome)
-  .cookbook-category-button {
+  .cookbook-category-button.has-category-image {
   background: transparent;
   border-color: transparent;
   box-shadow: none;
 }
 
 body:not(.cookbook-show-category-button-chrome)
-  .cookbook-category-button:hover,
+  .cookbook-category-button.has-category-image:hover,
 body:not(.cookbook-show-category-button-chrome)
-  .cookbook-category-button.is-active {
+  .cookbook-category-button.has-category-image.is-active {
   background: transparent;
   border-color: transparent;
   box-shadow: none;
 }
 
 body:not(.cookbook-show-category-button-chrome)
-  .cookbook-category-button:focus-visible {
+  .cookbook-category-button.has-category-image:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 3px;
 }
@@ -1614,6 +1654,10 @@ body:not(.cookbook-show-cooking-navigation) .cookbook-cooking-footer {
 
   .cookbook-browser-layout {
     grid-template-columns: 1fr;
+  }
+  
+  .cookbook-recipe-browser-screen .cookbook-browser-layout {
+    grid-template-rows: minmax(0, 35%) minmax(0, 1fr);
   }
 
   .cookbook-category-list {

@@ -8,6 +8,9 @@ import type CookbookPlugin from "./main";
 import { t } from "./i18n";
 
 export class CookbookSettingTab extends PluginSettingTab {
+  private static readonly categoryButtonImageKeyPrefix =
+    "categoryButtonImage.";
+
   constructor(
     app: App,
     private readonly plugin: CookbookPlugin,
@@ -16,6 +19,14 @@ export class CookbookSettingTab extends PluginSettingTab {
   }
 
   getControlValue(key: string): unknown {
+    const categoryId = this.getCategoryButtonImageCategoryId(key);
+
+    if (categoryId !== undefined) {
+      return this.plugin.settings.categoryButtons.find(
+        (button) => button.categoryId === categoryId,
+      )?.imagePath;
+    }
+
     return getPath(
       this.plugin.settings as unknown as Record<string, unknown>,
       key,
@@ -23,6 +34,24 @@ export class CookbookSettingTab extends PluginSettingTab {
   }
 
   async setControlValue(key: string, value: unknown): Promise<void> {
+    const categoryId = this.getCategoryButtonImageCategoryId(key);
+
+    if (categoryId !== undefined) {
+      const button = this.plugin.settings.categoryButtons.find(
+        (entry) => entry.categoryId === categoryId,
+      );
+
+      if (button) {
+        button.imagePath =
+          typeof value === "string" && value.trim().length > 0
+            ? value
+            : undefined;
+      }
+
+      await this.plugin.saveSettings();
+      return;
+    }
+
     setPath(
       this.plugin.settings as unknown as Record<string, unknown>,
       key,
@@ -34,6 +63,18 @@ export class CookbookSettingTab extends PluginSettingTab {
     if (key === "databaseFolder") {
       await this.plugin.refreshCategoryButtons();
     }
+  }
+  
+  private getCategoryButtonImageCategoryId(
+    key: string,
+  ): string | undefined {
+    if (!key.startsWith(CookbookSettingTab.categoryButtonImageKeyPrefix)) {
+      return undefined;
+    }
+
+    return decodeURIComponent(
+      key.slice(CookbookSettingTab.categoryButtonImageKeyPrefix.length),
+    );
   }
 
   getSettingDefinitions(): SettingDefinitionItem<string>[] {
@@ -232,18 +273,39 @@ export class CookbookSettingTab extends PluginSettingTab {
           void this.reorderCategoryButtons(oldIndex, newIndex);
         },
         items: this.plugin.getOrderedCategories().map(
-          ({ category }, index) => ({
+          ({ category }) => ({
             name: category.name,
             desc: t("settings.categoryButtons.description"),
             searchable: false,
             control: {
               type: "file" as const,
-              key: `categoryButtons.${index}.imagePath`,
+              key:
+                `${CookbookSettingTab.categoryButtonImageKeyPrefix}` +
+                encodeURIComponent(category.id),
               placeholder: t("settings.categoryButtons.imagePlaceholder"),
               filter: isImageFile,
             },
           }),
         ),
+      },
+      {
+        name: t("settings.browser.allRecipesButtonPlacement.name"),
+        desc: t("settings.browser.allRecipesButtonPlacement.description"),
+        control: {
+          type: "dropdown" as const,
+          key: "allRecipesButtonPlacement",
+          options: {
+            start: t(
+              "settings.browser.allRecipesButtonPlacement.start",
+            ),
+            end: t(
+              "settings.browser.allRecipesButtonPlacement.end",
+            ),
+            hidden: t(
+              "settings.browser.allRecipesButtonPlacement.hidden",
+            ),
+          },
+        },
       },
       {
         type: "group" as const,

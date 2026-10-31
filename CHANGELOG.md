@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+- Preserved the recipe-list scroll position when adding or removing a recipe from the shopping list.
+- Preserved the category-list scroll position when selecting a category in the recipe browser.
+- Category buttons and the recipe list now scroll independently in the recipe browser.
+- The recipe-browser action bar remains visible while scrolling recipes or categories.
+- Fixed category-button images being assigned to the wrong category after reordering categories in the plugin settings.
+- Fixed the “All recipes” category button becoming invisible when configured to appear after the category list.
+- Fixed the configured image for the “All recipes” button being handled inconsistently depending on its position.
+- Added a setting to place the “All recipes” category button at the beginning, at the end, or hide it completely.
+- The last selected recipe category is now stored persistently and restored when reopening the Cookbook or restarting Obsidian.
 - Added optional linked preparation recipes for ingredients, allowing cocktails and other recipes to reference homemade syrups, sauces, doughs, stocks, and similar intermediate products.
 - Shopping planning can optionally replace a referenced product with the correctly scaled ingredients of its preparation recipe.
 - Added built-in English and German UI localization.

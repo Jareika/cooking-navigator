@@ -1,5 +1,10 @@
 export type ResourcePriority = "none" | "primary" | "secondary";
 export type ImagePlacement = "cover" | "after-ingredients";
+export type AllRecipesButtonPlacement =
+  | "start"
+  | "end"
+  | "hidden";
+
 export type ShoppingStoreMode =
   | "favorite-first"
   | "fewest-stores"
@@ -32,6 +37,8 @@ export interface CookbookSettings {
   cookbookFocusMode: boolean;
   categoryButtons: CategoryButtonSettings[];
   guestButtons: GuestButtonSettings[];
+  allRecipesButtonPlacement: AllRecipesButtonPlacement;
+  lastSelectedCategoryId?: string;
   allRecipesButtonImagePath?: string;
   shoppingRecipeIds: string[];
   activeGuestIds: string[];

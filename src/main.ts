@@ -13,6 +13,7 @@ import type {
   CookbookSettings,
   CookbookPerson,
   GuestButtonSettings,
+  AllRecipesButtonPlacement,
   ManualShoppingItem,
   RecipeCategory,
   RecipeDocument,
@@ -47,6 +48,8 @@ const DEFAULT_SETTINGS: CookbookSettings = {
   cookbookFocusMode: false,
   categoryButtons: [],
   guestButtons: [],
+  allRecipesButtonPlacement: "start",
+  lastSelectedCategoryId: undefined,
   allRecipesButtonImagePath: undefined,
   shoppingRecipeIds: [],
   activeGuestIds: [],
@@ -425,6 +428,25 @@ export default class CookbookPlugin extends Plugin {
     this.settings.activeGuestIds = [...new Set(guestIds)];
     await this.saveSettings();
   }
+  
+  getAllRecipesButtonPlacement(): AllRecipesButtonPlacement {
+    const placement = this.settings.allRecipesButtonPlacement;
+
+    if (
+      placement === "start" ||
+      placement === "end" ||
+      placement === "hidden"
+    ) {
+      return placement;
+    }
+
+    return "start";
+  }
+
+  async setLastSelectedCategoryId(categoryId?: string): Promise<void> {
+    this.settings.lastSelectedCategoryId = categoryId;
+    await this.saveSettings();
+  }
 
   async resetShoppingPlanning(): Promise<void> {
     this.settings.shoppingRecipeIds = [];
@@ -434,6 +456,7 @@ export default class CookbookPlugin extends Plugin {
     this.settings.shoppingLocationId = undefined;
 	this.settings.manualShoppingItems = [];
 	this.settings.preparedRecipeIds = [];
+	this.settings.lastSelectedCategoryId = undefined;
 
     await this.saveSettings();
   }
@@ -616,6 +639,16 @@ export default class CookbookPlugin extends Plugin {
       )
     ) {
       this.settings.shoppingLocationId = undefined;
+      await this.saveSettings();
+    }
+	
+    if (
+      this.settings.lastSelectedCategoryId &&
+      !library.categories.some(
+        (category) => category.id === this.settings.lastSelectedCategoryId,
+      )
+    ) {
+      this.settings.lastSelectedCategoryId = undefined;
       await this.saveSettings();
     }
 

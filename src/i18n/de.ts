@@ -149,7 +149,7 @@ export const de: TranslationDictionary = {
     step: "Schritt {{number}}",
     activeTimers: "Aktive Timer",
     imageLoadError: "Rezeptbild konnte nicht geladen werden.",
-    openPreparationRecipe: "Zubereitungsrezept öffnen",
+    openPreparationRecipe: "Öffnen",
     preparationRecipeNotFound:
       "Das Zubereitungsrezept „{{recipeId}}“ wurde nicht gefunden.",
   },
@@ -503,6 +503,14 @@ export const de: TranslationDictionary = {
         description:
           "Optional kann ein quadratisches Bild aus dem Vault für den ersten Kategorie-Button in der Rezeptübersicht ausgewählt werden.",
         placeholder: "Bild auswählen…",
+      },
+      allRecipesButtonPlacement: {
+        name: "Position des Buttons „Alle Rezepte“",
+        description:
+          "Lege fest, ob der Button vor oder nach den Kategorien angezeigt oder vollständig ausgeblendet wird. Wenn er ausgeblendet ist, hebt ein Klick auf die aktive Kategorie den Filter wieder auf.",
+        start: "Am Anfang der Kategorien",
+        end: "Am Ende der Kategorien",
+        hidden: "Ausblenden",
       },
     },
     shopping: {

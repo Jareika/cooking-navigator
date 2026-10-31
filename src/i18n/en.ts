@@ -147,7 +147,7 @@ export const en = {
     step: "Step {{number}}",
     activeTimers: "Active timers",
     imageLoadError: "Recipe image could not be loaded.",
-    openPreparationRecipe: "Open preparation recipe",
+    openPreparationRecipe: "Open",
     preparationRecipeNotFound:
       "The preparation recipe “{{recipeId}}” could not be found.",
   },
@@ -495,6 +495,14 @@ export const en = {
         description:
           "Optionally select a square vault image for the first category button in the recipe browser.",
         placeholder: "Choose image…",
+      },
+      allRecipesButtonPlacement: {
+        name: "“All recipes” button position",
+        description:
+          "Choose whether the button is shown before or after the categories, or hidden completely. When hidden, clicking the active category clears the filter again.",
+        start: "Before categories",
+        end: "After categories",
+        hidden: "Hide",
       },
     },
     shopping: {
