@@ -1,4 +1,4 @@
-Cooking Navigator
+# Cooking Navigator (Obsidian Plugin)
 
 # No AI readme part (for those of you who care about):
 
@@ -59,7 +59,7 @@ It is designed for households where recipes need to adapt to the people eating t
 - Add recipe images before or after the ingredient overview.
 - Open recipes in a distraction-reduced step-by-step cooking mode.
 - Navigate cooking pages with buttons, swipe gestures, mouse dragging, or pen input.
-- Show preparation, cooking, and baking durations.
+- Show preparation, cooking, baking and inactive durations.
 - Create recipes directly inside Obsidian.
 - Create new categories while creating a recipe.
 
@@ -242,6 +242,8 @@ that support JSON Schema validation.
 > - recipe ingredient IDs refer to existing library ingredients;
 > - category, restriction-scope, allergen, location, and market IDs refer to
 >   existing library entries;
+> - every `utensilRequirements[].categoryId` refers to an existing
+>   `utensilCategories` entry;
 > - `produces.ingredientId` matches the ingredient used by recipes that link
 >   to this recipe through `preparationRecipeId`;
 > - preparation recipes do not form cycles.
@@ -268,6 +270,12 @@ that support JSON Schema validation.
       "type": "array",
       "items": {
         "$ref": "#/$defs/category"
+      }
+    },
+    "utensilCategories": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/utensilCategory"
       }
     },
     "restrictionScopes": {
@@ -337,6 +345,30 @@ that support JSON Schema validation.
         },
         "color": {
           "$ref": "#/$defs/color"
+        }
+      }
+    },
+    "utensilCategory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "shape"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shape": {
+          "enum": [
+            "cylinder",
+            "rectangular"
+          ]
         }
       }
     },
@@ -598,6 +630,11 @@ that support JSON Schema validation.
         "ingredientId": {
           "$ref": "#/$defs/id"
         },
+        "sectionHeading": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional heading displayed before this ingredient, for example “For the dough”."
+        },
         "preparationRecipeId": {
           "$ref": "#/$defs/id"
         },
@@ -623,6 +660,26 @@ that support JSON Schema validation.
         "note": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "tip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "heading",
+        "text"
+      ],
+      "properties": {
+        "heading": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Prominent tip heading, for example “SECRET TIP”."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Tip text. Newlines are preserved in cooking mode."
         }
       }
     },
@@ -653,6 +710,12 @@ that support JSON Schema validation.
         },
         "timerMinutes": {
           "$ref": "#/$defs/positiveNumber"
+        },
+        "tips": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tip"
+          }
         }
       }
     },
@@ -675,6 +738,60 @@ that support JSON Schema validation.
           "minLength": 1
         }
       }
+    },
+    "utensilRequirement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["categoryId", "diameterCm", "heightCm"],
+          "properties": {
+            "categoryId": { "$ref": "#/$defs/id" },
+            "diameterCm": { "$ref": "#/$defs/positiveNumber" },
+            "heightCm": { "$ref": "#/$defs/positiveNumber" },
+            "maxHeightCm": { "$ref": "#/$defs/positiveNumber" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["categoryId", "widthCm", "lengthCm", "heightCm"],
+          "properties": {
+            "categoryId": { "$ref": "#/$defs/id" },
+            "widthCm": { "$ref": "#/$defs/positiveNumber" },
+            "lengthCm": { "$ref": "#/$defs/positiveNumber" },
+            "heightCm": { "$ref": "#/$defs/positiveNumber" },
+            "maxHeightCm": { "$ref": "#/$defs/positiveNumber" }
+          }
+        }
+      ]
+    },
+    "pairing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Free text shown in the “Pairs well with” section."
+        },
+        "recipeId": {
+          "$ref": "#/$defs/id",
+          "description": "Optional ID of a linked recipe."
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "text"
+          ]
+        },
+        {
+          "required": [
+            "recipeId"
+          ]
+        }
+      ]
     },
     "recipe": {
       "type": "object",
@@ -702,8 +819,32 @@ that support JSON Schema validation.
             "$ref": "#/$defs/id"
           }
         },
+        "categorySortIndexes": {
+          "type": "object",
+          "description": "Optional category-specific browser priority. 1 is shown before 2, 2 before 3, and 3 before recipes without an index.",
+          "additionalProperties": {
+            "enum": [
+              1,
+              2,
+              3
+            ]
+          }
+        },
         "baseEaters": {
           "$ref": "#/$defs/positiveNumber"
+        },
+        "pairsWellWith": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pairing"
+          }
+        },
+        "tips": {
+          "type": "array",
+          "description": "Optional tips shown below the ingredient overview.",
+          "items": {
+            "$ref": "#/$defs/tip"
+          }
         },
         "produces": {
           "$ref": "#/$defs/produces"
@@ -733,6 +874,16 @@ that support JSON Schema validation.
         "bakeMinutes": {
           "$ref": "#/$defs/positiveNumber"
         },
+        "inactiveMinutes": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "utensilRequirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/utensilRequirement"
+          }
+        },
         "ingredients": {
           "type": "array",
           "items": {
@@ -754,5 +905,26 @@ that support JSON Schema validation.
 `Suffix` intentionally starts with an uppercase `S` because this is the
 existing JSON field name used by Cooking Navigator. It is kept for backwards
 compatibility.
+
+`sectionHeading` can be set on an ingredient to visually split an ingredient
+overview into sections such as “For the dough” and “For the filling”.
+
+Both recipes and individual cooking steps support a `tips` array. Every tip
+contains a prominent `heading` and free-form `text`; several tips can be added
+at each location.
+
+`categorySortIndexes` optionally prioritizes recipes inside individual
+categories. A lower index is shown first (`1`, then `2`, then `3`); recipes
+without an index retain the regular loading order. The keys are category IDs.
+
+```json
+{
+  "id": "pizzateig",
+  "title": "Pizzateig",
+  "categoryIds": ["pizza", "brot"],
+  "categorySortIndexes": {
+    "pizza": 1
+  }
+}
 
 ---

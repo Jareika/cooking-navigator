@@ -1,6 +1,6 @@
 {
   "name": "Cooking Navigator",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "An Obsidian cookbook plugin",
   "main": "main.js",
   "scripts": {

@@ -1,4 +1,44 @@
-## [Unreleased]
+## [1.0.2]
+
+- Added optional category-specific recipe sort indexes through `categorySortIndexes`.
+- Recipes with index `1`, `2`, or `3` are displayed before normally sorted recipes in the respective category.
+- Recipes sharing the same category sort index retain the normal cookbook loading order: JSON filename first, then recipe order within that file.
+- Added optional `sectionHeading` on recipe ingredients to divide ingredient overviews into visible sections such as “Für den Teig” and “Für die Füllung”.
+- Added optional recipe-level `tips` for notes shown below the ingredient overview.
+- Added optional step-level `tips` for notes shown below cooking instructions.
+- Tips support a prominent heading and multiline text, and multiple tips can be configured per recipe or cooking step.
+- Added a recipe-browser image view that can be toggled from the right-side action bar.
+- Recipe images now use the same width as recipe cards while preserving their original aspect ratio.
+- Shopping-list buttons remain beside recipe images and are aligned to the top in image view.
+- Recipes can now define multiple compatible utensil categories instead of being limited to one reference utensil.
+- A recipe can combine cylindrical and rectangular reference dishes, each with its own dimensions.
+- Added optional `maxHeightCm` for recipe utensil requirements.
+- When a selected baking dish is higher than `maxHeightCm`, its height is capped for volume-based scaling while the dish remains selectable.
+- Updated the recipe editor to configure multiple utensil requirements, including rectangular width and length dimensions.
+- Added rectangular utensil categories for casseroles, baking trays, brownie tins, and similar rectangular dishes.
+- Rectangular recipe and utensil dimensions use inner width, inner length, and usable inner height.
+- Utensil-based scaling now calculates either cylindrical or rectangular usable volume, depending on the configured utensil category.
+- Added utensil-based scaling for volume-dependent recipes such as pies, cakes, and round baking dishes.
+- Recipes can now define a utensil category and a reference form using inner diameter and usable height.
+- Added personal utensil management through a dedicated Cookbook modal and action-bar button.
+- Saved utensils can be selected in cooking mode when they are compatible with a recipe’s utensil category.
+- Ingredient amounts are scaled by the calculated ratio between selected and reference vessel volume.
+- Utensil-bound recipes no longer use guest weights, market package sizes, or primary/secondary resource priorities for automatic scaling.
+- Manual recipe scaling remains available and takes precedence over utensil-based scaling.
+- Added recipe-editor support for configuring a reference utensil directly while creating recipes.
+- Added shopping-list and cooking-mode scaling hints for utensil-bound recipes.
+- Added configurable favourite-recipe display modes: favourites can appear first within categories, remain in the normal recipe order, or be opened through a separate browser button.
+- Added an optional movable “Favourite recipes” browser button for recipes favourited by currently selected guests.
+- The favourite-recipes button can be reordered alongside category buttons and can use an optional vault image.
+- Added optional `pairsWellWith` recipe recommendations on the cooking-mode ingredient page, supporting free text and links to other recipes.
+- Linked recipe recommendations can be opened directly and added to or removed from the shopping list.
+- Added a cooking-mode action-bar button for adding or removing the currently opened recipe from the shopping list.
+- Added optional `inactiveMinutes` recipe metadata for inactive, resting, cooling, or waiting time.
+- Recipe cards now display inactive time alongside preparation, cooking, and baking durations.
+- Added an inactive/resting-time field to the recipe editor.
+- Unified shopping-list buttons in cooking mode and recipe recommendations with the recipe-browser shopping-button styling and state indicators.
+
+## [1.0.0]
 
 - Preserved the recipe-list scroll position when adding or removing a recipe from the shopping list.
 - Preserved the category-list scroll position when selecting a category in the recipe browser.

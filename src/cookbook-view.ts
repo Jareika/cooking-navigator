@@ -4,6 +4,11 @@ import {
   setIcon,
   WorkspaceLeaf,
 } from "obsidian";
+import {
+  getRecipeUtensilRequirements,
+  isCylindricalUtensilDimensions,
+  isRectangularUtensilDimensions,
+} from "./types";
 import type CookbookPlugin from "./main";
 import { resolveImageUrl } from "./image-utils";
 import type {
@@ -11,11 +16,20 @@ import type {
   CookbookPerson,
   ManualShoppingItem,
   Recipe,
+  RecipePairing,
   RecipeMatch,
   RecipePlan,
+  RecipeTip,
   ScaledIngredient,
+  UtensilCategory,
+  UtensilDimensions,
 } from "./types";
-import { buildRecipePlan, findRecipeMatches } from "./recipe-engine";
+import { FAVORITE_RECIPES_BUTTON_ID } from "./types";
+import {
+  buildRecipePlan,
+  findRecipeMatches,
+  type RecipePlanOptions,
+} from "./recipe-engine";
 import { RecipeScaleModal } from "./recipe-scale-modal";
 import { ResetShoppingPlanningModal } from "./reset-shopping-planning-modal";
 import {
@@ -47,6 +61,7 @@ export class CookbookView extends ItemView {
   private guestListEl: HTMLElement | null = null;
   private shoppingContentEl: HTMLElement | null = null;
   private timerUnsubscribers: Array<() => void> = [];
+  private recipeBrowserDisplayMode: "cards" | "images" = "cards";
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -281,9 +296,18 @@ export class CookbookView extends ItemView {
       );
     }
 
-    for (const { category, imagePath } of this.plugin.getOrderedCategories(
+    for (const browserButton of this.plugin.getOrderedBrowserButtons(
       this.library.categories,
     )) {
+      if (browserButton.kind === "favorites") {
+        this.renderFavoriteRecipesCategoryButton(
+          categoryList,
+          browserButton.imagePath,
+        );
+        continue;
+      }
+
+      const { category, imagePath } = browserButton;
       const button = this.createCategoryButton(categoryList, {
         cls: [
           "cookbook-category-button",
@@ -327,6 +351,52 @@ export class CookbookView extends ItemView {
         );
       });
     }
+  }
+  
+  private renderFavoriteRecipesCategoryButton(
+    parent: HTMLElement,
+    imagePath?: string,
+  ): void {
+    const selected =
+      this.selectedCategoryId === FAVORITE_RECIPES_BUTTON_ID;
+
+    const button = this.createCategoryButton(parent, {
+      cls: [
+        "cookbook-category-button",
+        "cookbook-favorite-recipes-category-button",
+        selected ? "is-active" : "",
+        imagePath ? "has-category-image" : "",
+      ],
+      pressed: selected,
+    });
+
+    this.addCategoryButtonLabel(
+      button,
+      t("browser.favoriteRecipes"),
+      "cookbook-favorite-recipes-label",
+    );
+
+    if (imagePath) {
+      const image = button.createEl("img", {
+        cls: "cookbook-category-button-image",
+        attr: {
+          src: this.resolveImageUrl(imagePath),
+          alt: "",
+        },
+      });
+
+      image.addEventListener("error", () => {
+        image.remove();
+        button.removeClass("has-category-image");
+        setIcon(button, "heart");
+      });
+    } else {
+      setIcon(button, "heart");
+    }
+
+    button.addEventListener("click", () => {
+      void this.selectCategory(FAVORITE_RECIPES_BUTTON_ID);
+    });
   }
 
   private renderAllRecipesCategoryButton(
@@ -380,8 +450,21 @@ export class CookbookView extends ItemView {
 
   private async selectCategory(categoryId: string | null): Promise<void> {
     this.selectedCategoryId = categoryId;
-    await this.plugin.setLastSelectedCategoryId(categoryId ?? undefined);
+
+    if (categoryId !== FAVORITE_RECIPES_BUTTON_ID) {
+      await this.plugin.setLastSelectedCategoryId(categoryId ?? undefined);
+    }
+
     this.refreshBrowserContent();
+  }
+  
+  private isFavoriteRecipe(
+    recipe: Recipe,
+    selectedPeople: CookbookPerson[],
+  ): boolean {
+    return selectedPeople.some((person) =>
+      person.favoriteRecipeIds.includes(recipe.id),
+    );
   }
 
   private renderBrowserRecipeGrid(): void {
@@ -404,9 +487,20 @@ export class CookbookView extends ItemView {
     const visibleRecipes = matches.filter(
       (match) =>
         match.isAllowed &&
-        (!this.selectedCategoryId ||
-          match.recipe.categoryIds.includes(this.selectedCategoryId)),
+        (
+          !this.selectedCategoryId ||
+          (
+            this.selectedCategoryId === FAVORITE_RECIPES_BUTTON_ID &&
+            this.isFavoriteRecipe(match.recipe, selectedPeople)
+          ) ||
+          (
+            this.selectedCategoryId !== FAVORITE_RECIPES_BUTTON_ID &&
+            match.recipe.categoryIds.includes(this.selectedCategoryId)
+          )
+        ),
     );
+	
+    this.sortBrowserRecipes(visibleRecipes, selectedPeople);
 
     if (visibleRecipes.length === 0) {
       grid.createDiv({
@@ -424,6 +518,191 @@ export class CookbookView extends ItemView {
         shoppingIngredientIds,
       );
     }
+  }
+  
+  private sortBrowserRecipes(
+    recipes: RecipeMatch[],
+    selectedPeople: CookbookPerson[],
+  ): void {
+    const sortFavoritesToTop =
+      this.plugin.getFavoriteRecipeDisplayMode() === "top" &&
+      this.selectedCategoryId !== FAVORITE_RECIPES_BUTTON_ID;
+
+    const selectedCategoryId =
+      this.selectedCategoryId &&
+      this.selectedCategoryId !== FAVORITE_RECIPES_BUTTON_ID
+        ? this.selectedCategoryId
+        : undefined;
+
+    recipes.sort((a, b) => {
+      const indexDifference =
+        this.getCategorySortPriority(a.recipe, selectedCategoryId) -
+        this.getCategorySortPriority(b.recipe, selectedCategoryId);
+
+      if (indexDifference !== 0) {
+        return indexDifference;
+      }
+
+      if (sortFavoritesToTop) {
+        const favoriteDifference =
+          Number(this.isFavoriteRecipe(b.recipe, selectedPeople)) -
+          Number(this.isFavoriteRecipe(a.recipe, selectedPeople));
+
+        if (favoriteDifference !== 0) {
+          return favoriteDifference;
+        }
+      }
+
+      return 0;
+    });
+  }
+
+  private getCategorySortPriority(
+    recipe: Recipe,
+    categoryId: string | undefined,
+  ): number {
+    if (!categoryId) {
+      return 4;
+    }
+
+    const index = recipe.categorySortIndexes?.[categoryId];
+
+    return index === 1 || index === 2 || index === 3
+      ? index
+      : 4;
+  }
+
+  private renderRecipeCard(
+    parent: HTMLElement,
+    match: RecipeMatch,
+    selectedPeople: CookbookPerson[],
+    shoppingIngredientIds: Set<string>,
+  ): void {
+    if (this.recipeBrowserDisplayMode === "images") {
+      this.renderRecipeImageCard(
+        parent,
+        match,
+        selectedPeople,
+        shoppingIngredientIds,
+      );
+	  return;
+    }
+
+    this.renderRecipeTextCard(
+      parent,
+      match,
+      selectedPeople,
+      shoppingIngredientIds,
+    );
+  }
+  
+  private renderRecipeImageCard(
+    parent: HTMLElement,
+    match: RecipeMatch,
+    selectedPeople: CookbookPerson[],
+    shoppingIngredientIds: Set<string>,
+  ): void {
+    const recipe = match.recipe;
+    const recipeIngredientIds = this.getRecipeIngredientIds(
+      recipe,
+      selectedPeople,
+    );
+    const matchingIngredientCount = [...recipeIngredientIds].filter((id) =>
+      shoppingIngredientIds.has(id),
+    ).length;
+    const hasAllIngredientsInShoppingList =
+      recipeIngredientIds.size > 0 &&
+      matchingIngredientCount === recipeIngredientIds.size;
+    const isInShoppingList = this.plugin.isRecipeInShoppingList(recipe.id);
+
+    const row = parent.createDiv({
+      cls: [
+        "cookbook-recipe-card-row",
+        "cookbook-recipe-image-card-row",
+      ],
+    });
+
+    const card = row.createEl("button", {
+      cls: [
+        "cookbook-recipe-card",
+        "cookbook-recipe-image-card",
+        recipe.imageUrl ? "" : "is-missing-recipe-image",
+      ],
+      attr: {
+        "aria-label": recipe.title,
+        title: recipe.title,
+      },
+    });
+
+    const favouritePeople = selectedPeople.filter((person) =>
+      person.favoriteRecipeIds.includes(recipe.id),
+    );
+
+    if (favouritePeople.length > 0) {
+      card.style.setProperty("--favorite-color", favouritePeople[0].color);
+      card.addClass("is-favorite");
+    }
+
+    if (recipe.imageUrl) {
+      const image = card.createEl("img", {
+        cls: "cookbook-recipe-image",
+        attr: {
+          src: this.resolveImageUrl(recipe.imageUrl),
+          alt: recipe.title,
+        },
+      });
+
+      image.addEventListener("error", () => {
+        image.remove();
+        card.addClass("is-missing-recipe-image");
+        card.createEl("strong", {
+          cls: "cookbook-recipe-image-fallback-title",
+          text: recipe.title,
+        });
+      });
+    } else {
+      card.createEl("strong", {
+        cls: "cookbook-recipe-image-fallback-title",
+        text: recipe.title,
+      });
+    }
+
+    card.addEventListener("click", () => {
+      this.screen = { kind: "cook", recipe, page: 0 };
+      this.render();
+    });
+
+    const shoppingButton = row.createEl("button", {
+      cls: [
+        "cookbook-recipe-shopping-button",
+        "cookbook-recipe-image-shopping-button",
+        isInShoppingList ? "is-in-shopping-list" : "",
+        hasAllIngredientsInShoppingList ? "is-complete" : "",
+      ],
+      attr: {
+        "aria-label": isInShoppingList
+          ? t("shopping.removeRecipe", { title: recipe.title })
+          : t("shopping.addRecipe", { title: recipe.title }),
+        title:
+          recipeIngredientIds.size > 0
+            ? t("shopping.recipeIngredientOverlap", {
+                matching: matchingIngredientCount,
+                total: recipeIngredientIds.size,
+              })
+            : t("shopping.noIngredients"),
+      },
+    });
+
+    setIcon(shoppingButton, isInShoppingList ? "shopping-cart" : "plus");
+
+    shoppingButton.createSpan({
+      cls: "cookbook-recipe-shopping-overlap",
+      text: `${matchingIngredientCount}/${recipeIngredientIds.size}`,
+    });
+
+    shoppingButton.addEventListener("click", () => {
+      void this.toggleRecipeShoppingList(recipe);
+    });
   }
   
   private renderGuestSelection(): void {
@@ -602,8 +881,91 @@ export class CookbookView extends ItemView {
       this.render();
     });
 	
+    if (this.screen.kind === "browser") {
+      const isImageMode = this.recipeBrowserDisplayMode === "images";
+      const recipeDisplayButton = actions.createEl("button", {
+        cls: [
+          "cookbook-browser-action",
+          "cookbook-recipe-display-mode-action",
+          isImageMode ? "is-active" : "",
+        ],
+        attr: {
+          "aria-label": isImageMode
+            ? t("actions.showRecipeCards")
+            : t("actions.showRecipeImages"),
+          "aria-pressed": String(isImageMode),
+          title: isImageMode
+            ? t("actions.showRecipeCards")
+            : t("actions.showRecipeImages"),
+        },
+      });
+
+      const updateRecipeDisplayButton = (): void => {
+        const imageMode =
+          this.recipeBrowserDisplayMode === "images";
+
+        recipeDisplayButton.toggleClass("is-active", imageMode);
+        recipeDisplayButton.setAttribute(
+          "aria-label",
+          imageMode
+            ? t("actions.showRecipeCards")
+            : t("actions.showRecipeImages"),
+        );
+        recipeDisplayButton.setAttribute(
+          "aria-pressed",
+          String(imageMode),
+        );
+        recipeDisplayButton.setAttribute(
+          "title",
+          imageMode
+            ? t("actions.showRecipeCards")
+            : t("actions.showRecipeImages"),
+        );
+
+        setIcon(recipeDisplayButton, imageMode ? "list" : "images");
+      };
+
+      updateRecipeDisplayButton();
+
+      recipeDisplayButton.addEventListener("click", () => {
+        this.recipeBrowserDisplayMode =
+          this.recipeBrowserDisplayMode === "images"
+            ? "cards"
+            : "images";
+        updateRecipeDisplayButton();
+        this.refreshBrowserContent();
+      });
+    }
+	
     if (this.screen.kind === "cook") {
       const recipe = this.screen.recipe;
+
+      const isInShoppingList = this.plugin.isRecipeInShoppingList(recipe.id);
+
+      const shoppingButton = actions.createEl("button", {
+        cls: [
+          "cookbook-browser-action",
+          "cookbook-recipe-shopping-button",
+          "cookbook-cooking-shopping-action",
+          isInShoppingList ? "is-active" : "",
+          isInShoppingList ? "is-in-shopping-list" : "",
+        ],
+        attr: {
+          "aria-label": isInShoppingList
+            ? t("shopping.removeRecipe", { title: recipe.title })
+            : t("shopping.addRecipe", { title: recipe.title }),
+          "aria-pressed": String(isInShoppingList),
+          title: isInShoppingList
+            ? t("shopping.removeRecipe", { title: recipe.title })
+            : t("shopping.addRecipe", { title: recipe.title }),
+        },
+      });
+
+      setIcon(shoppingButton, isInShoppingList ? "shopping-cart" : "plus");
+
+      shoppingButton.addEventListener("click", () => {
+        void this.toggleRecipeShoppingList(recipe);
+      });
 	  
       const backToBrowserButton = actions.createEl("button", {
         cls: [
@@ -721,6 +1083,22 @@ export class CookbookView extends ItemView {
     manageIngredientsButton.addEventListener("click", () => {
       this.plugin.openIngredientManagement(() => void this.reload());
     });
+	
+    const manageUtensilsButton = actions.createEl("button", {
+      cls: [
+        "cookbook-browser-action",
+        "cookbook-manage-utensils-action",
+      ],
+      attr: {
+        "aria-label": t("actions.manageUtensils"),
+        title: t("actions.manageUtensils"),
+      },
+    });
+
+    setIcon(manageUtensilsButton, "ruler");
+    manageUtensilsButton.addEventListener("click", () => {
+      this.plugin.openUtensilManagement(() => void this.reload());
+    });
 
     const manageGuestsButton = actions.createEl("button", {
       cls: "cookbook-browser-action",
@@ -814,11 +1192,11 @@ export class CookbookView extends ItemView {
     this.render();
   }
 
-  private renderRecipeCard(
+  private renderRecipeTextCard(
     parent: HTMLElement,
     match: RecipeMatch,
     selectedPeople: CookbookPerson[],
-	shoppingIngredientIds: Set<string>,
+    shoppingIngredientIds: Set<string>,
   ): void {
     const recipe = match.recipe;
     const recipeIngredientIds = this.getRecipeIngredientIds(
@@ -859,6 +1237,9 @@ export class CookbookView extends ItemView {
         : null,
       recipe.bakeMinutes
         ? t("browser.baking", { minutes: recipe.bakeMinutes })
+        : null,
+      recipe.inactiveMinutes
+        ? t("browser.inactive", { minutes: recipe.inactiveMinutes })
         : null,
     ]
       .filter(Boolean)
@@ -1805,8 +2186,22 @@ export class CookbookView extends ItemView {
     if (currentPage.kind === "ingredients") {
       pageEl.createEl("h1", { text: recipe.title });
 
-      const eaterText =
-        plan.eaterTotal > 0
+      const selectedUtensil =
+        this.plugin.getSelectedRecipeUtensil(recipe);
+
+      const utensilRequirements = getRecipeUtensilRequirements(recipe);
+
+      const eaterText = utensilRequirements.length > 0
+        ? selectedUtensil
+          ? t("cooking.utensilScale", {
+              utensil: selectedUtensil.name,
+              percent: formatNumber(
+                (this.plugin.getRecipeUtensilScaleFactor(recipe) ?? 1) *
+                  100,
+              ),
+            })
+          : t("cooking.referenceUtensilScale")
+        : plan.eaterTotal > 0
           ? t("cooking.forEaters", {
               count: formatNumber(plan.eaterTotal),
             })
@@ -1818,6 +2213,8 @@ export class CookbookView extends ItemView {
         cls: "cookbook-subtitle",
         text: eaterText,
       });
+	  
+	  this.renderUtensilSelector(pageEl, recipe);
 
       if (
         plan.packageAnchor &&
@@ -1840,6 +2237,10 @@ export class CookbookView extends ItemView {
         (preparationRecipeId) =>
           this.openPreparationRecipe(preparationRecipeId),
       );
+	  
+	  this.renderRecipeTips(pageEl, recipe.tips);
+	  
+	  this.renderRecipePairings(pageEl, recipe);
     }
 
     if (currentPage.kind === "step") {
@@ -1864,6 +2265,8 @@ export class CookbookView extends ItemView {
       for (const instruction of currentPage.step.instructions) {
         instructionList.createEl("li", { text: instruction });
       }
+	  
+	  this.renderRecipeTips(pageEl, currentPage.step.tips);
 
       if (currentPage.step.timerMinutes) {
         this.renderCookingTimerControls(
@@ -2164,6 +2567,127 @@ export class CookbookView extends ItemView {
     };
     this.render();
   }
+  
+  private renderRecipePairings(
+    parent: HTMLElement,
+    recipe: Recipe,
+  ): void {
+    const pairings = recipe.pairsWellWith ?? [];
+
+    if (pairings.length === 0) {
+      return;
+    }
+
+    const section = parent.createDiv("cookbook-recipe-pairings");
+    section.createEl("h2", {
+      text: t("cooking.pairsWellWith"),
+    });
+
+    const list = section.createDiv("cookbook-recipe-pairing-list");
+
+    for (const pairing of pairings) {
+      this.renderRecipePairing(list, pairing);
+    }
+  }
+  
+  private renderRecipeTips(
+    parent: HTMLElement,
+    tips: RecipeTip[] | undefined,
+  ): void {
+    const visibleTips = (tips ?? []).filter(
+      (tip) => tip.heading.trim() || tip.text.trim(),
+    );
+
+    if (visibleTips.length === 0) {
+      return;
+    }
+
+    const section = parent.createDiv("cookbook-recipe-tips");
+
+    for (const tip of visibleTips) {
+      const tipEl = section.createDiv("cookbook-recipe-tip");
+
+      if (tip.heading.trim()) {
+        tipEl.createEl("h2", {
+          text: tip.heading.trim(),
+        });
+      }
+
+      if (tip.text.trim()) {
+        tipEl.createEl("p", {
+          text: tip.text.trim(),
+        });
+      }
+    }
+  }
+
+  private renderRecipePairing(
+    parent: HTMLElement,
+    pairing: RecipePairing,
+  ): void {
+    const linkedRecipe = pairing.recipeId
+      ? this.recipes.find((recipe) => recipe.id === pairing.recipeId)
+      : undefined;
+
+    if (!linkedRecipe) {
+      parent.createDiv({
+        cls: "cookbook-recipe-pairing-text",
+        text: pairing.text ?? pairing.recipeId ?? "",
+      });
+      return;
+    }
+
+    const row = parent.createDiv("cookbook-recipe-pairing-recipe");
+    const recipeButton = row.createEl("button", {
+      cls: "cookbook-recipe-pairing-open",
+      text: pairing.text
+        ? `${linkedRecipe.title} · ${pairing.text}`
+        : linkedRecipe.title,
+      attr: {
+        "aria-label": t("cooking.openPairedRecipe", {
+          title: linkedRecipe.title,
+        }),
+        title: t("cooking.openPairedRecipe", {
+          title: linkedRecipe.title,
+        }),
+      },
+    });
+
+    recipeButton.addEventListener("click", () => {
+      this.screen = {
+        kind: "cook",
+        recipe: linkedRecipe,
+        page: 0,
+      };
+      this.render();
+    });
+
+    const isInShoppingList = this.plugin.isRecipeInShoppingList(
+      linkedRecipe.id,
+    );
+
+    const shoppingButton = row.createEl("button", {
+      cls: [
+        "cookbook-recipe-shopping-button",
+        "cookbook-recipe-pairing-shopping-button",
+        isInShoppingList ? "is-in-shopping-list" : "",
+      ],
+      attr: {
+        "aria-label": isInShoppingList
+          ? t("shopping.removeRecipe", { title: linkedRecipe.title })
+          : t("shopping.addRecipe", { title: linkedRecipe.title }),
+        title: isInShoppingList
+          ? t("shopping.removeRecipe", { title: linkedRecipe.title })
+          : t("shopping.addRecipe", { title: linkedRecipe.title }),
+      },
+    });
+
+    setIcon(shoppingButton, isInShoppingList ? "shopping-cart" : "plus");
+
+    shoppingButton.addEventListener("click", () => {
+      void this.toggleRecipeShoppingList(linkedRecipe);
+    });
+  }
 
   private disposeTimerSubscriptions(): void {
     for (const unsubscribe of this.timerUnsubscribers) {
@@ -2241,14 +2765,16 @@ export class CookbookView extends ItemView {
   private getRecipePlanOptions(
     recipe: Recipe,
     packageStoreIds: string[],
-  ): {
-    packageStoreIds: string[];
-    manualScaleFactor?: number;
-  } {
+  ): RecipePlanOptions {
     return {
       packageStoreIds,
       manualScaleFactor: this.plugin.getRecipeScaleOverride(recipe.id)
         ?.scaleFactor,
+      utensilScaleFactor: this.plugin.getRecipeUtensilScaleFactor(
+        recipe,
+      ),
+      disableAutomaticScaling:
+        getRecipeUtensilRequirements(recipe).length > 0,
     };
   }
 
@@ -2275,6 +2801,21 @@ export class CookbookView extends ItemView {
         unit: override.unit,
       });
     }
+	
+    if (getRecipeUtensilRequirements(recipe).length > 0) {
+      const utensil = this.plugin.getSelectedRecipeUtensil(recipe);
+      const scaleFactor =
+        this.plugin.getRecipeUtensilScaleFactor(recipe);
+
+      if (utensil && scaleFactor) {
+        return t("shopping.utensilScaling", {
+          utensil: utensil.name,
+          percent: formatNumber(scaleFactor * 100),
+        });
+      }
+
+      return t("shopping.referenceUtensilScaling");
+    }
 
     const plan = buildRecipePlan(
       recipe,
@@ -2294,6 +2835,174 @@ export class CookbookView extends ItemView {
     return t("shopping.scalingForEaters", {
       count: formatNumber(plan.eaterTotal || recipe.baseEaters),
     });
+  }
+  
+  private renderUtensilSelector(
+    parent: HTMLElement,
+    recipe: Recipe,
+  ): void {
+    if (!this.library) {
+      return;
+    }
+
+    const requirements = getRecipeUtensilRequirements(recipe);
+
+    if (requirements.length === 0) {
+      return;
+    }
+
+    const categoryById = new Map(
+      (this.library.utensilCategories ?? []).map((category) => [
+        category.id,
+        category,
+      ]),
+    );
+
+    const section = parent.createDiv("cookbook-utensil-selector");
+    section.createEl("strong", {
+      text: t("utensils.title"),
+    });
+
+    section.createEl("small", {
+      text: t("utensils.references", {
+        references: requirements
+          .map((requirement) => {
+            const category = categoryById.get(
+              requirement.categoryId,
+            );
+
+            return `${category?.name ?? requirement.categoryId}: ` +
+              this.formatUtensilDimensions(category, requirement);
+          })
+          .join(" · "),
+      }),
+    });
+
+    const select = section.createEl("select", {
+      attr: {
+        "aria-label": t("utensils.selectForRecipe", {
+          title: recipe.title,
+        }),
+      },
+    });
+
+    select.createEl("option", {
+      value: "",
+      text: t("utensils.useReference"),
+    });
+
+    const utensils = requirements.flatMap((requirement) => {
+      const category = categoryById.get(requirement.categoryId);
+
+      if (!category) {
+        return [];
+      }
+
+      return this.plugin.getUtensilsForCategory(category.id);
+    });
+
+    for (const requirement of requirements) {
+      const category = categoryById.get(requirement.categoryId);
+
+      if (!category) {
+        continue;
+      }
+
+      const group = select.createEl("optgroup", {
+        attr: {
+          label: category.name,
+        },
+      });
+
+      for (const utensil of this.plugin.getUtensilsForCategory(
+        category.id,
+      )) {
+        group.createEl("option", {
+          value: utensil.id,
+          text: t("utensils.option", {
+            name: utensil.name,
+            dimensions: this.formatUtensilDimensions(
+              category,
+              utensil,
+            ),
+          }),
+        });
+      }
+    }
+
+    const selectedUtensil =
+      this.plugin.getSelectedRecipeUtensil(recipe);
+
+    select.value = selectedUtensil?.id ?? "";
+
+    if (utensils.length === 0) {
+      section.createEl("small", {
+        cls: "cookbook-utensil-warning",
+        text: t("utensils.noCompatibleUtensils"),
+      });
+    }
+
+    const scaleFactor =
+      this.plugin.getRecipeUtensilScaleFactor(recipe);
+
+    if (selectedUtensil && scaleFactor) {
+      section.createEl("small", {
+        cls: "cookbook-utensil-scale-hint",
+        text: t("utensils.scaleHint", {
+          percent: formatNumber(scaleFactor * 100),
+        }),
+      });
+
+      const requirement = requirements.find(
+        (entry) => entry.categoryId === selectedUtensil.categoryId,
+      );
+
+      if (
+        requirement?.maxHeightCm &&
+        selectedUtensil.heightCm > requirement.maxHeightCm
+      ) {
+        section.createEl("small", {
+          cls: "cookbook-utensil-scale-hint",
+          text: t("utensils.maxHeightApplied", {
+            height: formatNumber(requirement.maxHeightCm),
+          }),
+        });
+      }
+    }
+
+    select.addEventListener("change", () => {
+      void this.plugin
+        .setRecipeUtensil(recipe.id, select.value || undefined)
+        .then(() => this.render());
+    });
+  }
+  
+  private formatUtensilDimensions(
+    category: UtensilCategory | undefined,
+    dimensions: UtensilDimensions,
+  ): string {
+    if (
+      category?.shape === "cylinder" &&
+      isCylindricalUtensilDimensions(dimensions)
+    ) {
+      return t("utensils.cylindricalDimensions", {
+        diameter: formatNumber(dimensions.diameterCm),
+        height: formatNumber(dimensions.heightCm),
+      });
+    }
+
+    if (
+      category?.shape === "rectangular" &&
+      isRectangularUtensilDimensions(dimensions)
+    ) {
+      return t("utensils.rectangularDimensions", {
+        width: formatNumber(dimensions.widthCm),
+        length: formatNumber(dimensions.lengthCm),
+        height: formatNumber(dimensions.heightCm),
+      });
+    }
+
+    return t("utensils.invalidDimensions");
   }
   
   private getPreparationRecipeScaleDescription(
@@ -2625,6 +3334,13 @@ function renderIngredientGrid(
   const grid = parent.createDiv("cookbook-ingredient-grid");
 
   for (const item of ingredients) {
+    if (item.sectionHeading?.trim()) {
+      grid.createEl("h2", {
+        cls: "cookbook-ingredient-section-heading",
+        text: item.sectionHeading.trim(),
+      });
+    }
+
     const card = grid.createDiv({
       cls: [
         "cookbook-ingredient",

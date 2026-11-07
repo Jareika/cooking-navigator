@@ -1,10 +1,17 @@
 import { App, Modal, setIcon, TFile } from "obsidian";
 import type CookbookPlugin from "./main";
+import {
+  hasValidUtensilDimensions,
+  isCylindricalUtensilDimensions,
+  isRectangularUtensilDimensions,
+} from "./types";
 import type {
   CookbookLibrary,
   Recipe,
   RecipeIngredient,
   RecipeStep,
+  RecipeUtensilRequirement,
+  UtensilCategory,
 } from "./types";
 import { t } from "./i18n";
 
@@ -166,6 +173,15 @@ export class RecipeEditorModal extends Modal {
     bakeInput.addEventListener("change", () => {
       this.draft.bakeMinutes = getOptionalNumber(bakeInput.value);
     });
+	
+    const inactiveInput = this.createOptionalNumberField(
+      fields,
+      t("recipeEditor.general.inactiveMinutes"),
+      this.draft.inactiveMinutes,
+    );
+    inactiveInput.addEventListener("change", () => {
+      this.draft.inactiveMinutes = getOptionalNumber(inactiveInput.value);
+    });
 
     const imageLabel = fields.createEl("label", {
       cls: "cookbook-recipe-editor-field",
@@ -266,7 +282,295 @@ export class RecipeEditorModal extends Modal {
       },
     );
 
+    this.renderUtensilRequirementControls(section);
     this.renderProducesControls(section);
+  }
+  
+  private renderUtensilRequirementControls(
+    parent: HTMLElement,
+  ): void {
+    if (!this.library) {
+      return;
+    }
+
+    const categories = this.library.utensilCategories ?? [];
+    const section = parent.createDiv(
+      "cookbook-recipe-editor-utensil",
+    );
+
+    section.createEl("small", {
+      text: t("recipeEditor.utensil.heading"),
+    });
+
+    if (categories.length === 0) {
+      section.createEl("small", {
+        cls: "setting-item-description",
+        text: t("recipeEditor.utensil.noCategories"),
+      });
+      return;
+    }
+
+    const enabledLabel = section.createEl("label", {
+      cls: "cookbook-recipe-editor-produces-enabled",
+    });
+
+    const requirements = this.getDraftUtensilRequirements();
+    const enabledInput = enabledLabel.createEl("input", {
+      attr: {
+        type: "checkbox",
+      },
+    });
+
+    enabledInput.checked = requirements.length > 0;
+    enabledLabel.createSpan({
+      text: t("recipeEditor.utensil.enabled"),
+    });
+
+    enabledInput.addEventListener("change", () => {
+      this.setDraftUtensilRequirements(
+        enabledInput.checked
+          ? [this.createDefaultUtensilRequirement(categories[0])]
+          : [],
+      );
+      this.refreshEditor();
+    });
+
+    if (requirements.length === 0) {
+      return;
+    }
+
+    const list = section.createDiv(
+      "cookbook-recipe-editor-utensil-requirements",
+    );
+
+    for (const [index, requirement] of requirements.entries()) {
+      this.renderUtensilRequirementEditor(
+        list,
+        requirements,
+        requirement,
+        index,
+        categories,
+      );
+    }
+
+    const availableCategories = categories.filter(
+      (category) =>
+        !requirements.some(
+          (requirement) => requirement.categoryId === category.id,
+        ),
+    );
+
+    if (availableCategories.length === 0) {
+      return;
+    }
+
+    const addControls = section.createDiv(
+      "cookbook-recipe-editor-add-category",
+    );
+    const categorySelect = addControls.createEl("select");
+
+    for (const category of availableCategories) {
+      categorySelect.createEl("option", {
+        value: category.id,
+        text: category.name,
+      });
+    }
+
+    const addButton = addControls.createEl("button", {
+      text: t("recipeEditor.utensil.addRequirement"),
+    });
+
+    addButton.addEventListener("click", () => {
+      const category = categories.find(
+        (entry) => entry.id === categorySelect.value,
+      );
+
+      if (!category) {
+        return;
+      }
+
+      this.setDraftUtensilRequirements([
+        ...requirements,
+        this.createDefaultUtensilRequirement(category),
+      ]);
+      this.refreshEditor();
+    });
+  }
+  
+  private renderUtensilRequirementEditor(
+    parent: HTMLElement,
+    requirements: RecipeUtensilRequirement[],
+    requirement: RecipeUtensilRequirement,
+    index: number,
+    categories: UtensilCategory[],
+  ): void {
+    const category =
+      categories.find((entry) => entry.id === requirement.categoryId) ??
+      categories[0];
+
+    if (!category) {
+      return;
+    }
+
+    const card = parent.createDiv(
+      "cookbook-recipe-editor-utensil-requirement",
+    );
+    const fields = card.createDiv("cookbook-recipe-editor-fields");
+
+    const categoryLabel = fields.createEl("label", {
+      cls: "cookbook-recipe-editor-field",
+      text: t("recipeEditor.utensil.category"),
+    });
+    const categorySelect = categoryLabel.createEl("select");
+
+    for (const entry of categories) {
+      categorySelect.createEl("option", {
+        value: entry.id,
+        text: entry.name,
+      });
+    }
+
+    categorySelect.value = category.id;
+    categorySelect.addEventListener("change", () => {
+      const nextCategory = categories.find(
+        (entry) => entry.id === categorySelect.value,
+      );
+
+      if (!nextCategory) {
+        return;
+      }
+
+      requirements[index] = {
+        ...this.createDefaultUtensilRequirement(nextCategory),
+        maxHeightCm: requirement.maxHeightCm,
+      };
+      this.setDraftUtensilRequirements(requirements);
+      this.refreshEditor();
+    });
+
+    const maxHeightInput = this.createOptionalNumberField(
+      fields,
+      t("recipeEditor.utensil.maxHeight"),
+      requirement.maxHeightCm,
+    );
+
+    if (category.shape === "cylinder") {
+      const diameterInput = this.createNumberField(
+        fields,
+        t("recipeEditor.utensil.diameter"),
+        isCylindricalUtensilDimensions(requirement)
+          ? requirement.diameterCm
+          : 26,
+        0.1,
+        0.1,
+      );
+      const heightInput = this.createNumberField(
+        fields,
+        t("recipeEditor.utensil.height"),
+        requirement.heightCm,
+        0.1,
+        0.1,
+      );
+
+      const update = (): void => {
+        requirements[index] = {
+          categoryId: category.id,
+          diameterCm: Number(diameterInput.value),
+          heightCm: Number(heightInput.value),
+          maxHeightCm: getOptionalNumber(maxHeightInput.value),
+        };
+        this.setDraftUtensilRequirements(requirements);
+      };
+
+      diameterInput.addEventListener("change", update);
+      heightInput.addEventListener("change", update);
+      maxHeightInput.addEventListener("change", update);
+    } else {
+      const widthInput = this.createNumberField(
+        fields,
+        t("recipeEditor.utensil.width"),
+        isRectangularUtensilDimensions(requirement)
+          ? requirement.widthCm
+          : 20,
+        0.1,
+        0.1,
+      );
+      const lengthInput = this.createNumberField(
+        fields,
+        t("recipeEditor.utensil.length"),
+        isRectangularUtensilDimensions(requirement)
+          ? requirement.lengthCm
+          : 30,
+        0.1,
+        0.1,
+      );
+      const heightInput = this.createNumberField(
+        fields,
+        t("recipeEditor.utensil.height"),
+        requirement.heightCm,
+        0.1,
+        0.1,
+      );
+
+      const update = (): void => {
+        requirements[index] = {
+          categoryId: category.id,
+          widthCm: Number(widthInput.value),
+          lengthCm: Number(lengthInput.value),
+          heightCm: Number(heightInput.value),
+          maxHeightCm: getOptionalNumber(maxHeightInput.value),
+        };
+        this.setDraftUtensilRequirements(requirements);
+      };
+
+      widthInput.addEventListener("change", update);
+      lengthInput.addEventListener("change", update);
+      heightInput.addEventListener("change", update);
+      maxHeightInput.addEventListener("change", update);
+    }
+
+    const removeButton = this.createIconButton(
+      card,
+      "trash-2",
+      t("recipeEditor.utensil.removeRequirement"),
+    );
+
+    removeButton.addEventListener("click", () => {
+      this.setDraftUtensilRequirements(
+        requirements.filter((_, entryIndex) => entryIndex !== index),
+      );
+      this.refreshEditor();
+    });
+  }
+
+  private getDraftUtensilRequirements(): RecipeUtensilRequirement[] {
+    return this.draft.utensilRequirements ?? [];
+  }
+
+  private setDraftUtensilRequirements(
+    requirements: RecipeUtensilRequirement[],
+  ): void {
+    this.draft.utensilRequirements =
+      requirements.length > 0 ? requirements : undefined;
+  }
+
+  private createDefaultUtensilRequirement(
+    category: UtensilCategory | undefined,
+  ): RecipeUtensilRequirement {
+    if (category?.shape === "rectangular") {
+      return {
+        categoryId: category.id,
+        widthCm: 20,
+        lengthCm: 30,
+        heightCm: 5,
+      };
+    }
+
+    return {
+      categoryId: category?.id ?? "",
+      diameterCm: 26,
+      heightCm: 5,
+    };
   }
   
   private renderProducesControls(parent: HTMLElement): void {
@@ -793,6 +1097,15 @@ export class RecipeEditorModal extends Modal {
       return;
     }
 	
+    const utensilRequirements = this.getDraftUtensilRequirements();
+
+    if (!this.areUtensilRequirementsValid(utensilRequirements)) {
+      this.plugin.notice(
+        t("recipeEditor.validation.invalidUtensil"),
+      );
+      return;
+    }
+	
     const assignedRecipeIngredientIds = new Set(
       this.draft.ingredients.map((ingredient) => ingredient.ingredientId),
     );
@@ -834,6 +1147,12 @@ export class RecipeEditorModal extends Modal {
       title,
       categoryIds: [...new Set(this.draft.categoryIds)],
       restrictionScopeIds: [...new Set(this.draft.restrictionScopeIds)],
+      utensilRequirements:
+        utensilRequirements.length > 0
+          ? utensilRequirements.map((requirement) => ({
+              ...requirement,
+            }))
+          : undefined,
       ingredients: this.draft.ingredients.map((ingredient) => ({
         ...ingredient,
       })),
@@ -863,6 +1182,34 @@ export class RecipeEditorModal extends Modal {
         Number.isFinite(ingredient.amount) &&
         ingredient.amount > 0,
     );
+  }
+  
+  private areUtensilRequirementsValid(
+    requirements: RecipeUtensilRequirement[],
+  ): boolean {
+    const usedCategoryIds = new Set<string>();
+
+    return requirements.every((requirement) => {
+      const category = this.library?.utensilCategories?.find(
+        (entry) => entry.id === requirement.categoryId,
+      );
+
+      if (
+        !category ||
+        usedCategoryIds.has(category.id) ||
+        !hasValidUtensilDimensions(category.shape, requirement)
+      ) {
+        return false;
+      }
+
+      usedCategoryIds.add(category.id);
+
+      return (
+        requirement.maxHeightCm === undefined ||
+        (Number.isFinite(requirement.maxHeightCm) &&
+          requirement.maxHeightCm > 0)
+      );
+    });
   }
 
   private createIngredient(): RecipeIngredient | null {

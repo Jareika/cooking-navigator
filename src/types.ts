@@ -4,11 +4,101 @@ export type AllRecipesButtonPlacement =
   | "start"
   | "end"
   | "hidden";
+  
+export type FavoriteRecipeDisplayMode =
+  | "top"
+  | "normal"
+  | "button";
+  
+export type CategorySortIndex = 1 | 2 | 3;
+
+export const FAVORITE_RECIPES_BUTTON_ID =
+  "__cookbook-favorite-recipes__";
 
 export type ShoppingStoreMode =
   | "favorite-first"
   | "fewest-stores"
   | "ingredient-stores";
+  
+export type UtensilShape = "cylinder" | "rectangular";
+
+export interface UtensilCategory {
+  id: string;
+  name: string;
+  shape: UtensilShape;
+}
+
+export type UtensilDimensions =
+  | {
+      diameterCm: number;
+      heightCm: number;
+      widthCm?: never;
+      lengthCm?: never;
+    }
+  | {
+      widthCm: number;
+      lengthCm: number;
+      heightCm: number;
+      diameterCm?: never;
+    };
+	
+export type CylindricalUtensilDimensions = Extract<
+  UtensilDimensions,
+  { diameterCm: number }
+>;
+
+export type RectangularUtensilDimensions = Extract<
+  UtensilDimensions,
+  { widthCm: number; lengthCm: number }
+>;
+
+export function isCylindricalUtensilDimensions(
+  dimensions: UtensilDimensions,
+): dimensions is CylindricalUtensilDimensions {
+  return (
+    typeof dimensions.diameterCm === "number" &&
+    Number.isFinite(dimensions.diameterCm) &&
+    dimensions.diameterCm > 0 &&
+    Number.isFinite(dimensions.heightCm) &&
+    dimensions.heightCm > 0
+  );
+}
+
+export function isRectangularUtensilDimensions(
+  dimensions: UtensilDimensions,
+): dimensions is RectangularUtensilDimensions {
+  return (
+    typeof dimensions.widthCm === "number" &&
+    Number.isFinite(dimensions.widthCm) &&
+    dimensions.widthCm > 0 &&
+    typeof dimensions.lengthCm === "number" &&
+    Number.isFinite(dimensions.lengthCm) &&
+    dimensions.lengthCm > 0 &&
+    Number.isFinite(dimensions.heightCm) &&
+    dimensions.heightCm > 0
+  );
+}
+
+export function hasValidUtensilDimensions(
+  shape: UtensilShape,
+  dimensions: UtensilDimensions,
+): boolean {
+  return shape === "cylinder"
+    ? isCylindricalUtensilDimensions(dimensions)
+    : isRectangularUtensilDimensions(dimensions);
+}
+
+export type CookbookUtensil = {
+  id: string;
+  name: string;
+  categoryId: string;
+} & UtensilDimensions;
+
+export type RecipeUtensilRequirement = {
+  categoryId: string;
+  maxHeightCm?: number;
+} & UtensilDimensions;
+
   
 export interface RecipeScaleOverride {
   ingredientId: string;
@@ -38,6 +128,7 @@ export interface CookbookSettings {
   categoryButtons: CategoryButtonSettings[];
   guestButtons: GuestButtonSettings[];
   allRecipesButtonPlacement: AllRecipesButtonPlacement;
+  favoriteRecipeDisplayMode: FavoriteRecipeDisplayMode;
   lastSelectedCategoryId?: string;
   allRecipesButtonImagePath?: string;
   shoppingRecipeIds: string[];
@@ -53,6 +144,8 @@ export interface CookbookSettings {
   preparedRecipeIds: string[];
   timerAlarmSoundPath?: string;
   timerAlarmVolume: number;
+  utensils: CookbookUtensil[];
+  selectedUtensilIdsByRecipe: Record<string, string>;
 }
 
 export interface CategoryButtonSettings {
@@ -126,6 +219,7 @@ export interface ShoppingLocation {
 export interface CookbookLibrary {
   version: 1;
   categories: RecipeCategory[];
+  utensilCategories?: UtensilCategory[];
   restrictionScopes: RestrictionScope[];
   allergens?: AllergenDefinition[];
   shoppingLocations?: ShoppingLocation[];
@@ -136,6 +230,7 @@ export interface CookbookLibrary {
 
 export interface RecipeIngredient {
   ingredientId: string;
+  sectionHeading?: string;
   preparationRecipeId?: string;
   alternativeIngredientId?: string;
   amount: number;
@@ -145,18 +240,32 @@ export interface RecipeIngredient {
   note?: string;
 }
 
+export interface RecipeTip {
+  heading: string;
+  text: string;
+}
+
+export interface RecipePairing {
+  text?: string;
+  recipeId?: string;
+}
+
 export interface RecipeStep {
   title?: string;
   ingredients: RecipeIngredient[];
   instructions: string[];
   timerMinutes?: number;
+  tips?: RecipeTip[];
 }
 
 export interface Recipe {
   id: string;
   title: string;
   categoryIds: string[];
+  categorySortIndexes?: Record<string, CategorySortIndex>;
   baseEaters: number;
+  pairsWellWith?: RecipePairing[];
+  tips?: RecipeTip[];
   produces?: {
     ingredientId: string;
     amount: number;
@@ -168,8 +277,16 @@ export interface Recipe {
   prepMinutes?: number;
   cookMinutes?: number;
   bakeMinutes?: number;
+  inactiveMinutes?: number;
+  utensilRequirements?: RecipeUtensilRequirement[];
   ingredients: RecipeIngredient[];
   steps: RecipeStep[];
+}
+
+export function getRecipeUtensilRequirements(
+  recipe: Recipe,
+): RecipeUtensilRequirement[] {
+  return recipe.utensilRequirements ?? [];
 }
 
 export interface RecipeDocument {

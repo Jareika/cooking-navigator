@@ -60,7 +60,10 @@ export class CookbookSettingTab extends PluginSettingTab {
 
     await this.plugin.saveSettings();
 
-    if (key === "databaseFolder") {
+    if (
+      key === "databaseFolder" ||
+      key === "favoriteRecipeDisplayMode"
+    ) {
       await this.plugin.refreshCategoryButtons();
     }
   }
@@ -272,21 +275,29 @@ export class CookbookSettingTab extends PluginSettingTab {
         onReorder: (oldIndex: number, newIndex: number) => {
           void this.reorderCategoryButtons(oldIndex, newIndex);
         },
-        items: this.plugin.getOrderedCategories().map(
-          ({ category }) => ({
-            name: category.name,
-            desc: t("settings.categoryButtons.description"),
+        items: this.plugin.getOrderedBrowserButtons().map((button) => ({
+            name:
+              button.kind === "favorites"
+                ? t("browser.favoriteRecipes")
+                : button.category.name,
+            desc:
+              button.kind === "favorites"
+                ? t("settings.categoryButtons.favoriteDescription")
+                : t("settings.categoryButtons.description"),
             searchable: false,
             control: {
               type: "file" as const,
               key:
                 `${CookbookSettingTab.categoryButtonImageKeyPrefix}` +
-                encodeURIComponent(category.id),
+                encodeURIComponent(
+                  button.kind === "favorites"
+                    ? "__cookbook-favorite-recipes__"
+                    : button.category.id,
+                ),
               placeholder: t("settings.categoryButtons.imagePlaceholder"),
               filter: isImageFile,
             },
-          }),
-        ),
+          })),
       },
       {
         name: t("settings.browser.allRecipesButtonPlacement.name"),
@@ -304,6 +315,19 @@ export class CookbookSettingTab extends PluginSettingTab {
             hidden: t(
               "settings.browser.allRecipesButtonPlacement.hidden",
             ),
+          },
+        },
+      },
+      {
+        name: t("settings.browser.favoriteRecipes.name"),
+        desc: t("settings.browser.favoriteRecipes.description"),
+        control: {
+          type: "dropdown" as const,
+          key: "favoriteRecipeDisplayMode",
+          options: {
+            top: t("settings.browser.favoriteRecipes.top"),
+            normal: t("settings.browser.favoriteRecipes.normal"),
+            button: t("settings.browser.favoriteRecipes.button"),
           },
         },
       },

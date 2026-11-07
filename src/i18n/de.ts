@@ -12,12 +12,16 @@ export const de: TranslationDictionary = {
     backToRecipeBrowser: "Zur Rezeptübersicht",
     selectGuests: "Gäste auswählen",
     openShoppingList: "Einkaufsliste öffnen",
+    showRecipeImages: "Rezeptbilder anzeigen",
+    showRecipeCards: "Rezeptkarten anzeigen",
     resetShoppingPlanning: "Einkaufsplanung zurücksetzen",
     createRecipe: "Neues Rezept erstellen",
 	openSettings: "Cooking-Navigator-Einstellungen öffnen",
 	scaleRecipe: "Rezept manuell skalieren",
     manageIngredients:
       "Zutaten, Einkaufsorte und Supermärkte verwalten",
+    manageUtensils:
+      "Utensilien und Backformen verwalten",
     manageGuests: "Gäste verwalten",
     showAllergens: "Allergenhinweise anzeigen",
     hideAllergens: "Allergenhinweise ausblenden",
@@ -26,12 +30,14 @@ export const de: TranslationDictionary = {
   },
   browser: {
     allRecipes: "Alle Rezepte",
+	favoriteRecipes: "Lieblingsrezepte",
     noRecipesMatch:
       "Keine Rezepte passen zu den ausgewählten Gästen und der Kategorie.",
     noTimeInformation: "Keine Zeitangabe",
     preparation: "{{minutes}} Min. Vorbereitung",
     cooking: "{{minutes}} Min. Kochen",
     baking: "{{minutes}} Min. Backen",
+	inactive: "{{minutes}} Min. Inaktiv",
   },
   guests: {
     title: "Gäste auswählen",
@@ -115,6 +121,10 @@ export const de: TranslationDictionary = {
     automaticScaling:
       "Automatisch skaliert über {{ingredient}}: {{amount}} {{unit}}",
     scalingForEaters: "Skalierung für {{count}} Portionseinheiten",
+    utensilScaling:
+      "Skalierung für {{utensil}}: {{percent}} % der Referenzform",
+    referenceUtensilScaling:
+      "Referenzform; automatische Gäste- und Packungsskalierung ist deaktiviert",
     email: "Einkaufsliste per E-Mail öffnen",
     emailSubject: "Einkaufsliste",
     emailRecipes: "Rezepte:",
@@ -140,6 +150,10 @@ export const de: TranslationDictionary = {
   cooking: {
     forEaters: "Für {{count}} Portionseinheiten",
     baseRecipe: "Grundrezept für {{count}} Portionseinheiten",
+    utensilScale:
+      "{{utensil}} ausgewählt · {{percent}} % des Referenzrezepts",
+    referenceUtensilScale:
+      "Referenzform des Rezepts verwenden",
     packageHint:
       "{{ingredient}}: Auf {{amount}} {{unit}} skaliert, da dies eine kritische Ressource ist.",
     previous: "Zurück",
@@ -150,6 +164,8 @@ export const de: TranslationDictionary = {
     activeTimers: "Aktive Timer",
     imageLoadError: "Rezeptbild konnte nicht geladen werden.",
     openPreparationRecipe: "Öffnen",
+    pairsWellWith: "Passt gut zu",
+    openPairedRecipe: "„{{title}}“ öffnen",
     preparationRecipeNotFound:
       "Das Zubereitungsrezept „{{recipeId}}“ wurde nicht gefunden.",
   },
@@ -266,6 +282,7 @@ export const de: TranslationDictionary = {
       preparationMinutes: "Vorbereitung (Min.)",
       cookingMinutes: "Kochen (Min.)",
       bakingMinutes: "Backen (Min.)",
+	  inactiveMinutes: "Inaktiv / Ruhezeit (Min.)",
       recipeImage: "Rezeptbild",
       noImage: "Kein Bild",
       imagePlacement: "Bildposition",
@@ -279,6 +296,22 @@ export const de: TranslationDictionary = {
       ingredient: "Hergestellte Zutat",
       amount: "Erzeugte Menge",
       unit: "Einheit der Ausgabemenge",
+    },
+    utensil: {
+      heading: "Backform / Utensil",
+      enabled:
+        "Dieses Rezept ist an eine Backform oder ein Utensil gebunden",
+      noCategories:
+        "In cookbook-library.json sind keine Utensilienkategorien hinterlegt.",
+      category: "Utensilienkategorie",
+      diameter: "Innendurchmesser (cm)",
+      width: "Innenbreite (cm)",
+      length: "Innenlänge (cm)",
+      height: "Nutzbare Innenhöhe (cm)",
+      maxHeight:
+        "Maximal für die Skalierung verwendete Höhe (cm, optional)",
+      addRequirement: "Weitere passende Kategorie hinzufügen",
+      removeRequirement: "Kategorie vom Rezept entfernen",
     },
     categories: {
       placeholder: "Neue Kategorie, z. B. Aufläufe",
@@ -334,7 +367,9 @@ export const de: TranslationDictionary = {
         "Jede Zutat benötigt eine gültige Auswahl und eine Menge größer als null.",
       invalidProducedAmount:
         "Für die hergestellte Zutat müssen Zutat, Menge größer als null und Einheit angegeben werden.",
-      stepIngredientNotAssigned:
+      invalidUtensil:
+        "Utensilienkategorie, Durchmesser und Höhe müssen gültig sein.", 
+	  stepIngredientNotAssigned:
         "Kochschritte dürfen nur Zutaten verwenden, die dem Rezept zugeordnet wurden.",
       stepsRequired:
         "Bitte erstelle mindestens einen Kochschritt mit einer Anweisung.",
@@ -418,6 +453,51 @@ export const de: TranslationDictionary = {
       plural: "Plural",
       add: "Zutat hinzufügen",
     },
+  },
+  utensils: {
+    title: "Backform / Utensil",
+    reference:
+      "Referenz: {{category}} · {{dimensions}}",
+    references: "Referenzformen: {{references}}",
+    useReference: "Rezeptform verwenden",
+    selectForRecipe: "Utensil für „{{title}}“ auswählen",
+    option: "{{name}} · {{dimensions}}",
+    cylindricalDimensions:
+      "Ø {{diameter}} cm · Höhe {{height}} cm",
+    rectangularDimensions:
+      "{{width}} × {{length}} cm · Höhe {{height}} cm",
+    invalidDimensions: "ungültige Maße",
+    noCompatibleUtensils:
+      "Es ist noch kein kompatibles Utensil gespeichert.",
+    scaleHint:
+      "Die Zutaten werden auf {{percent}} % des Referenzvolumens skaliert.",
+    maxHeightApplied:
+      "Für die Skalierung wird die nutzbare Höhe auf {{height}} cm begrenzt.",
+  },
+  utensilManagement: {
+    title: "Utensilien verwalten",
+    description:
+      "Speichere deine Backformen und andere kompatible Utensilien. Durchmesser und Höhe müssen nutzbare Innenmaße sein.",
+    errorTitle: "Utensilien verwalten",
+    libraryLoadError:
+      "Die Cookbook-Bibliothek konnte nicht geladen werden.",
+    noCategories:
+      "Es sind keine Utensilienkategorien hinterlegt. Ergänze zuerst utensilCategories in cookbook-library.json.",
+    empty: "Es sind noch keine Utensilien gespeichert.",
+    addHeading: "Utensil hinzufügen",
+    name: "Name",
+    namePlaceholder: "z. B. Pieform mittel",
+    category: "Kategorie",
+    diameter: "Innendurchmesser (cm)",
+    width: "Innenbreite (cm)",
+    length: "Innenlänge (cm)",
+    height: "Nutzbare Innenhöhe (cm)",
+    add: "Utensil hinzufügen",
+    save: "Speichern",
+    delete: "{{name}} löschen",
+    nameRequired: "Bitte gib einen Namen für das Utensil ein.",
+    invalidDimensions:
+      "Durchmesser und nutzbare Innenhöhe müssen größer als null sein.",
   },
   settings: {
     validation: {
@@ -512,6 +592,14 @@ export const de: TranslationDictionary = {
         end: "Am Ende der Kategorien",
         hidden: "Ausblenden",
       },
+      favoriteRecipes: {
+        name: "Anzeige von Lieblingsrezepten",
+        description:
+          "Lege fest, ob Lieblingsrezepte der ausgewählten Gäste in jeder Kategorie zuerst erscheinen, in der normalen Reihenfolge bleiben oder über einen eigenen verschiebbaren Button geöffnet werden.",
+        top: "Lieblingsrezepte je Kategorie zuerst anzeigen",
+        normal: "Normale Rezeptreihenfolge beibehalten",
+        button: "Eigenen Button für Lieblingsrezepte verwenden",
+      },
     },
     shopping: {
       heading: "Einkaufsliste",
@@ -547,6 +635,8 @@ export const de: TranslationDictionary = {
         "Noch keine Kategorien gefunden. Erstelle oder wähle zuerst eine Kochbuchdatenbank aus.",
       description:
         "Ziehe diese Zeile, um die Reihenfolge in der Rezeptübersicht zu ändern. Optional kann ein quadratisches Kategorienbild aus dem Vault ausgewählt werden.",
+      favoriteDescription:
+        "Ziehe diese Zeile, um den Button für Lieblingsrezepte in der Rezeptübersicht zu positionieren. Optional kann ein quadratisches Bild aus dem Vault ausgewählt werden.",
       imagePlaceholder: "Kategorienbild auswählen…",
     },
     notices: {

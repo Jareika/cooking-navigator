@@ -3,17 +3,28 @@ import { CookbookDatabase } from "./database";
 import { CookingTimerController } from "./cooking-timer";
 import { CookbookSettingTab } from "./settings";
 import { GuestSettingsModal } from "./guest-settings-modal";
+import { UtensilManagementModal } from "./utensil-management-modal";
 import { resolveImageUrl } from "./image-utils";
+import {
+  getUtensilScaleFactor as calculateUtensilScaleFactor,
+} from "./recipe-engine";
 import {
   COOKBOOK_VIEW_TYPE,
   CookbookView,
 } from "./cookbook-view";
+import {
+  FAVORITE_RECIPES_BUTTON_ID,
+  getRecipeUtensilRequirements,
+  isCylindricalUtensilDimensions,
+  isRectangularUtensilDimensions,
+} from "./types";
 import type {
   CookbookLibrary,
   CookbookSettings,
   CookbookPerson,
   GuestButtonSettings,
   AllRecipesButtonPlacement,
+  FavoriteRecipeDisplayMode,
   ManualShoppingItem,
   RecipeCategory,
   RecipeDocument,
@@ -21,6 +32,8 @@ import type {
   Recipe,
   ShoppingLocation,
   StoreDefinition,
+  CookbookUtensil,
+  UtensilCategory,
 } from "./types";
 import { IngredientManagementModal } from "./ingredient-management-modal";
 import { RecipeEditorModal } from "./recipe-editor-modal";
@@ -49,6 +62,7 @@ const DEFAULT_SETTINGS: CookbookSettings = {
   categoryButtons: [],
   guestButtons: [],
   allRecipesButtonPlacement: "start",
+  favoriteRecipeDisplayMode: "normal",
   lastSelectedCategoryId: undefined,
   allRecipesButtonImagePath: undefined,
   shoppingRecipeIds: [],
@@ -64,6 +78,8 @@ const DEFAULT_SETTINGS: CookbookSettings = {
   preparedRecipeIds: [],
   timerAlarmSoundPath: undefined,
   timerAlarmVolume: 0.8,
+  utensils: [],
+  selectedUtensilIdsByRecipe: {},
 };
 
 const EXAMPLE_LIBRARY: CookbookLibrary = {
@@ -219,6 +235,7 @@ export default class CookbookPlugin extends Plugin {
   private knownPeople: CookbookPerson[] = [];
   private knownMarkets: StoreDefinition[] = [];
   private knownShoppingLocations: ShoppingLocation[] = [];
+  private knownUtensilCategories: UtensilCategory[] = [];
 
   async onload(): Promise<void> {
     initializeI18n();
@@ -328,6 +345,7 @@ export default class CookbookPlugin extends Plugin {
     await this.syncGuestButtons(library.people);
     this.knownMarkets = library.markets ?? [];
     this.knownShoppingLocations = library.shoppingLocations ?? [];
+	this.knownUtensilCategories = library.utensilCategories ?? [];
     await this.migrateLegacyFavoriteStore();
     return library;
   }
@@ -339,11 +357,13 @@ export default class CookbookPlugin extends Plugin {
       await this.syncGuestButtons(library.people);
       this.knownMarkets = library.markets ?? [];
 	  this.knownShoppingLocations = library.shoppingLocations ?? [];
+	  this.knownUtensilCategories = library.utensilCategories ?? [];
     } catch {
       this.knownCategories = [];
       this.knownPeople = [];
       this.knownMarkets = [];
 	  this.knownShoppingLocations = [];
+	  this.knownUtensilCategories = [];
       this.settingsTab?.update();
     }
   }
@@ -419,6 +439,131 @@ export default class CookbookPlugin extends Plugin {
     delete this.settings.manualRecipeScaleOverrides[recipeId];
     await this.saveSettings();
   }
+  
+  getUtensilsForCategory(categoryId: string): CookbookUtensil[] {
+    return this.settings.utensils
+      .filter((utensil) => utensil.categoryId === categoryId)
+      .filter((utensil) =>
+        isCylindricalUtensilDimensions(utensil) ||
+        isRectangularUtensilDimensions(utensil),
+      )
+      .map((utensil) => ({ ...utensil }))
+      .sort((a, b) => a.name.localeCompare(b.name, "de"));
+  }
+
+  getSelectedRecipeUtensil(
+    recipe: Recipe,
+  ): CookbookUtensil | undefined {
+    const requirements = getRecipeUtensilRequirements(recipe);
+
+    if (requirements.length === 0) {
+      return undefined;
+    }
+
+    const selectedUtensilId =
+      this.settings.selectedUtensilIdsByRecipe[recipe.id];
+
+    if (!selectedUtensilId) {
+      return undefined;
+    }
+
+    for (const requirement of requirements) {
+      const utensil = this.getUtensilsForCategory(
+        requirement.categoryId,
+      ).find((entry) => entry.id === selectedUtensilId);
+
+      if (utensil) {
+        return utensil;
+      }
+    }
+
+    return undefined;
+  }
+
+  getRecipeUtensilScaleFactor(
+    recipe: Recipe,
+  ): number | undefined {
+    const utensil = this.getSelectedRecipeUtensil(recipe);
+
+    if (!utensil) {
+      return undefined;
+    }
+	
+    const requirement = getRecipeUtensilRequirements(recipe).find(
+      (entry) => entry.categoryId === utensil.categoryId,
+    );
+
+    if (!requirement) {
+      return undefined;
+    }
+
+    const category = this.knownUtensilCategories.find(
+      (entry) => entry.id === requirement.categoryId,
+    );
+
+    if (!category) {
+      return undefined;
+    }
+
+    return calculateUtensilScaleFactor(
+      category.shape,
+      requirement,
+      utensil,
+	  requirement.maxHeightCm,
+    );
+  }
+
+  async setRecipeUtensil(
+    recipeId: string,
+    utensilId: string | undefined,
+  ): Promise<void> {
+    if (utensilId) {
+      this.settings.selectedUtensilIdsByRecipe[recipeId] =
+        utensilId;
+    } else {
+      delete this.settings.selectedUtensilIdsByRecipe[recipeId];
+    }
+
+    await this.saveSettings();
+  }
+
+  async addUtensil(utensil: CookbookUtensil): Promise<void> {
+    if (this.settings.utensils.some((entry) => entry.id === utensil.id)) {
+      throw new Error(`Utensil-ID existiert bereits: ${utensil.id}`);
+    }
+
+    this.settings.utensils.push({ ...utensil });
+    await this.saveSettings();
+  }
+
+  async updateUtensil(utensil: CookbookUtensil): Promise<void> {
+    const index = this.settings.utensils.findIndex(
+      (entry) => entry.id === utensil.id,
+    );
+
+    if (index < 0) {
+      return;
+    }
+
+    this.settings.utensils[index] = { ...utensil };
+    await this.saveSettings();
+  }
+
+  async removeUtensil(utensilId: string): Promise<void> {
+    this.settings.utensils = this.settings.utensils.filter(
+      (utensil) => utensil.id !== utensilId,
+    );
+
+    for (const [recipeId, selectedUtensilId] of Object.entries(
+      this.settings.selectedUtensilIdsByRecipe,
+    )) {
+      if (selectedUtensilId === utensilId) {
+        delete this.settings.selectedUtensilIdsByRecipe[recipeId];
+      }
+    }
+
+    await this.saveSettings();
+  }
 
   getActiveGuestIds(): string[] {
     return [...new Set(this.settings.activeGuestIds)];
@@ -441,6 +586,20 @@ export default class CookbookPlugin extends Plugin {
     }
 
     return "start";
+  }
+  
+  getFavoriteRecipeDisplayMode(): FavoriteRecipeDisplayMode {
+    const mode = this.settings.favoriteRecipeDisplayMode;
+
+    if (
+      mode === "top" ||
+      mode === "normal" ||
+      mode === "button"
+    ) {
+      return mode;
+    }
+
+    return "normal";
   }
 
   async setLastSelectedCategoryId(categoryId?: string): Promise<void> {
@@ -549,6 +708,10 @@ export default class CookbookPlugin extends Plugin {
     new IngredientManagementModal(this.app, this, onChanged).open();
   }
   
+  openUtensilManagement(onChanged: () => void): void {
+    new UtensilManagementModal(this.app, this, onChanged).open();
+  }
+  
   openRecipeEditor(onChanged: () => void): void {
     new RecipeEditorModal(this.app, this, onChanged).open();
   }
@@ -587,6 +750,81 @@ export default class CookbookPlugin extends Plugin {
       if (!addedIds.has(category.id)) {
         ordered.push({ category });
       }
+    }
+
+    return ordered;
+  }
+  
+  getOrderedBrowserButtons(
+    categories: RecipeCategory[] = this.knownCategories,
+  ): Array<
+    | {
+        kind: "category";
+        category: RecipeCategory;
+        imagePath?: string;
+      }
+    | {
+        kind: "favorites";
+        imagePath?: string;
+      }
+  > {
+    const categoryById = new Map(
+      categories.map((category) => [category.id, category]),
+    );
+
+    const ordered: Array<
+      | {
+          kind: "category";
+          category: RecipeCategory;
+          imagePath?: string;
+        }
+      | {
+          kind: "favorites";
+          imagePath?: string;
+        }
+    > = [];
+
+    const addedCategoryIds = new Set<string>();
+    let favoritesAdded = false;
+
+    for (const button of this.settings.categoryButtons) {
+      if (
+        button.categoryId === FAVORITE_RECIPES_BUTTON_ID &&
+        this.getFavoriteRecipeDisplayMode() === "button"
+      ) {
+        ordered.push({
+          kind: "favorites",
+          imagePath: button.imagePath,
+        });
+        favoritesAdded = true;
+        continue;
+      }
+
+      const category = categoryById.get(button.categoryId);
+
+      if (!category || addedCategoryIds.has(category.id)) {
+        continue;
+      }
+
+      ordered.push({
+        kind: "category",
+        category,
+        imagePath: button.imagePath,
+      });
+      addedCategoryIds.add(category.id);
+    }
+
+    for (const category of categories) {
+      if (!addedCategoryIds.has(category.id)) {
+        ordered.push({ kind: "category", category });
+      }
+    }
+
+    if (
+      this.getFavoriteRecipeDisplayMode() === "button" &&
+      !favoritesAdded
+    ) {
+      ordered.push({ kind: "favorites" });
     }
 
     return ordered;
@@ -631,6 +869,7 @@ export default class CookbookPlugin extends Plugin {
     await this.syncGuestButtons(library.people);
     this.knownMarkets = library.markets ?? [];
     this.knownShoppingLocations = library.shoppingLocations ?? [];
+	this.knownUtensilCategories = library.utensilCategories ?? [];
 
     if (
       this.settings.shoppingLocationId &&
@@ -773,10 +1012,17 @@ export default class CookbookPlugin extends Plugin {
     this.knownCategories = categories;
 
     const categoryIds = new Set(categories.map((category) => category.id));
+    const validButtonIds = new Set([
+      ...categoryIds,
+      FAVORITE_RECIPES_BUTTON_ID,
+    ]);
     const usedIds = new Set<string>();
 
     const existing = this.settings.categoryButtons.filter((button) => {
-      if (!categoryIds.has(button.categoryId) || usedIds.has(button.categoryId)) {
+      if (
+        !validButtonIds.has(button.categoryId) ||
+        usedIds.has(button.categoryId)
+      ) {
         return false;
       }
 
@@ -788,7 +1034,17 @@ export default class CookbookPlugin extends Plugin {
       .filter((category) => !usedIds.has(category.id))
       .map((category) => ({ categoryId: category.id }));
 
-    const nextButtons = [...existing, ...missing];
+    const favoriteButtonMissing =
+      this.getFavoriteRecipeDisplayMode() === "button" &&
+      !usedIds.has(FAVORITE_RECIPES_BUTTON_ID);
+
+    const nextButtons = [
+      ...existing,
+      ...missing,
+      ...(favoriteButtonMissing
+        ? [{ categoryId: FAVORITE_RECIPES_BUTTON_ID }]
+        : []),
+    ];
 
     if (
       JSON.stringify(nextButtons) !==

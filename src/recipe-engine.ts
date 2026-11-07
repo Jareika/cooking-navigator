@@ -1,7 +1,13 @@
+import {
+  isCylindricalUtensilDimensions,
+  isRectangularUtensilDimensions,
+} from "./types";
 import type {
   AllergenDefinition,
   CookbookLibrary,
   CookbookPerson,
+  UtensilDimensions,
+  UtensilShape,
   IngredientDefinition,
   Recipe,
   RecipeIngredient,
@@ -23,6 +29,94 @@ export interface RecipePlanOptions {
   packageStoreIds?: Iterable<string>;
   manualScaleFactor?: number;
   fixedScaleFactor?: number;
+  utensilScaleFactor?: number;
+  disableAutomaticScaling?: boolean;
+}
+
+export function getCylinderVolumeCm3(
+  diameterCm: number,
+  heightCm: number,
+): number | undefined {
+  if (
+    !Number.isFinite(diameterCm) ||
+    !Number.isFinite(heightCm) ||
+    diameterCm <= 0 ||
+    heightCm <= 0
+  ) {
+    return undefined;
+  }
+
+  const radiusCm = diameterCm / 2;
+  return Math.PI * radiusCm ** 2 * heightCm;
+}
+
+export function getRectangularVolumeCm3(
+  widthCm: number,
+  lengthCm: number,
+  heightCm: number,
+): number | undefined {
+  if (
+    !Number.isFinite(widthCm) ||
+    !Number.isFinite(lengthCm) ||
+    !Number.isFinite(heightCm) ||
+    widthCm <= 0 ||
+    lengthCm <= 0 ||
+    heightCm <= 0
+  ) {
+    return undefined;
+  }
+
+  return widthCm * lengthCm * heightCm;
+}
+
+export function getUtensilScaleFactor(
+  shape: UtensilShape,
+  reference: UtensilDimensions,
+  target: UtensilDimensions,
+  maxHeightCm?: number,
+): number | undefined {
+  const effectiveTargetHeight =
+    Number.isFinite(maxHeightCm) && (maxHeightCm ?? 0) > 0
+      ? Math.min(target.heightCm, maxHeightCm ?? target.heightCm)
+      : target.heightCm;
+
+  const referenceVolume =
+    shape === "cylinder" &&
+    isCylindricalUtensilDimensions(reference)
+      ? getCylinderVolumeCm3(
+          reference.diameterCm,
+          reference.heightCm,
+        )
+      : shape === "rectangular" &&
+          isRectangularUtensilDimensions(reference)
+        ? getRectangularVolumeCm3(
+            reference.widthCm,
+            reference.lengthCm,
+            reference.heightCm,
+          )
+        : undefined;
+
+  const targetVolume =
+    shape === "cylinder" &&
+    isCylindricalUtensilDimensions(target)
+      ? getCylinderVolumeCm3(
+          target.diameterCm,
+          effectiveTargetHeight,
+        )
+      : shape === "rectangular" &&
+          isRectangularUtensilDimensions(target)
+        ? getRectangularVolumeCm3(
+            target.widthCm,
+            target.lengthCm,
+             effectiveTargetHeight,
+          )
+        : undefined;
+
+  if (!referenceVolume || !targetVolume) {
+    return undefined;
+  }
+
+  return targetVolume / referenceVolume;
 }
 
 export function findRecipeMatches(
@@ -275,7 +369,21 @@ export function buildRecipePlan(
       ? options.fixedScaleFactor
       : undefined;
 
-  const packageAnchor = manualScaleFactor || fixedScaleFactor
+  const utensilScaleFactor =
+    options.utensilScaleFactor &&
+    Number.isFinite(options.utensilScaleFactor) &&
+    options.utensilScaleFactor > 0
+      ? options.utensilScaleFactor
+      : undefined;
+
+  const automaticScalingDisabled =
+    Boolean(options.disableAutomaticScaling);
+
+  const packageAnchor =
+    manualScaleFactor ||
+    fixedScaleFactor ||
+    utensilScaleFactor ||
+    automaticScalingDisabled
     ? undefined
     : findPackageAnchor(
         recipe,
@@ -289,12 +397,15 @@ export function buildRecipePlan(
   const scaleFactor =
     fixedScaleFactor ??
     manualScaleFactor ??
+	utensilScaleFactor ??
     (packageAnchor
       ? Math.max(
           requestedScaleFactor,
           packageAnchor.resultingScale,
         )
-      : requestedScaleFactor);
+      : automaticScalingDisabled
+        ? 1
+        : requestedScaleFactor);
 
   const scale = (item: RecipeIngredient): ScaledIngredient => {
     const resolved = resolveIngredient(

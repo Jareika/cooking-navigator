@@ -10,11 +10,14 @@ export const en = {
     backToRecipeBrowser: "Back to recipe browser",
     selectGuests: "Select guests",
     openShoppingList: "Open shopping list",
+    showRecipeImages: "Show recipe images",
+    showRecipeCards: "Show recipe cards",
     resetShoppingPlanning: "Reset shopping planning",
     createRecipe: "Create recipe",
 	openSettings: "Open Cooking Navigator settings",
 	scaleRecipe: "Scale recipe manually",
     manageIngredients: "Manage ingredients, shopping locations, and stores",
+	manageUtensils: "Manage utensils and baking dishes",
     manageGuests: "Manage guests",
     showAllergens: "Show allergen notices",
     hideAllergens: "Hide allergen notices",
@@ -23,12 +26,14 @@ export const en = {
   },
   browser: {
     allRecipes: "All recipes",
+	favoriteRecipes: "Favourite recipes",
     noRecipesMatch:
       "No recipes match the selected guests and category.",
     noTimeInformation: "No time information",
     preparation: "{{minutes}} min prep",
     cooking: "{{minutes}} min cook",
     baking: "{{minutes}} min bake",
+	inactive: "{{minutes}} min inactive",
   },
   guests: {
     title: "Select guests",
@@ -113,6 +118,10 @@ export const en = {
     automaticScaling:
       "Automatically scaled using {{ingredient}}: {{amount}} {{unit}}",
     scalingForEaters: "Scaling for {{count}} eater units",
+    utensilScaling:
+      "Scaled for {{utensil}}: {{percent}}% of the reference dish",
+    referenceUtensilScaling:
+      "Reference baking dish; automatic guest and package scaling is disabled",
     email: "Open shopping list by email",
     emailSubject: "Shopping list",
     emailRecipes: "Recipes:",
@@ -138,6 +147,10 @@ export const en = {
   cooking: {
     forEaters: "For {{count}} eater units",
     baseRecipe: "Base recipe for {{count}} eater units",
+    utensilScale:
+      "{{utensil}} selected · {{percent}}% of the reference recipe",
+    referenceUtensilScale:
+      "Reference baking dish selected",
     packageHint:
       "{{ingredient}}: scaled to {{amount}} {{unit}} because it is a critical resource.",
     previous: "Previous",
@@ -148,6 +161,8 @@ export const en = {
     activeTimers: "Active timers",
     imageLoadError: "Recipe image could not be loaded.",
     openPreparationRecipe: "Open",
+    pairsWellWith: "Pairs well with",
+    openPairedRecipe: "Open “{{title}}”",
     preparationRecipeNotFound:
       "The preparation recipe “{{recipeId}}” could not be found.",
   },
@@ -263,6 +278,7 @@ export const en = {
       preparationMinutes: "Preparation (min.)",
       cookingMinutes: "Cooking (min.)",
       bakingMinutes: "Baking (min.)",
+	  inactiveMinutes: "Inactive / resting time (min.)",
       recipeImage: "Recipe image",
       noImage: "No image",
       imagePlacement: "Image placement",
@@ -276,6 +292,22 @@ export const en = {
       ingredient: "Produced ingredient",
       amount: "Produced amount",
       unit: "Output unit",
+    },
+    utensil: {
+      heading: "Baking dish / utensil",
+      enabled:
+        "This recipe is tied to a baking dish or utensil",
+      noCategories:
+        "No utensil categories are configured in cookbook-library.json.",
+      category: "Utensil category",
+      diameter: "Inner diameter (cm)",
+      width: "Inner width (cm)",
+      length: "Inner length (cm)",
+      height: "Usable inner height (cm)",
+      maxHeight:
+        "Maximum height used for scaling (cm, optional)",
+      addRequirement: "Add another compatible category",
+      removeRequirement: "Remove category from recipe",
     },
     categories: {
       placeholder: "New category, e.g. Casseroles",
@@ -330,7 +362,9 @@ export const en = {
         "Every ingredient needs a valid selection and an amount greater than zero.",
       invalidProducedAmount:
         "The produced ingredient needs an ingredient, an amount greater than zero, and a unit.",
-      stepIngredientNotAssigned:
+      invalidUtensil:
+        "The utensil category, diameter, and height must be valid.",
+	  stepIngredientNotAssigned:
         "Cooking steps may only use ingredients assigned to the recipe.",
       stepsRequired:
         "Please create at least one cooking step with an instruction.",
@@ -414,6 +448,50 @@ export const en = {
       plural: "Plural",
       add: "Add ingredient",
     },
+  },
+  utensils: {
+    title: "Baking dish / utensil",
+    reference:
+      "Reference: {{category}} · {{dimensions}}",
+    references: "Reference dishes: {{references}}",
+    useReference: "Use recipe reference dish",
+    selectForRecipe: "Select utensil for {{title}}",
+    option: "{{name}} · {{dimensions}}",
+    cylindricalDimensions:
+      "Ø {{diameter}} cm · height {{height}} cm",
+    rectangularDimensions:
+      "{{width}} × {{length}} cm · height {{height}} cm",
+    invalidDimensions: "invalid dimensions",
+    noCompatibleUtensils:
+      "No compatible saved utensil is available yet.",
+    scaleHint:
+      "Ingredients are scaled to {{percent}}% of the reference volume.",
+    maxHeightApplied:
+      "The usable height is limited to {{height}} cm for scaling.",
+  },
+  utensilManagement: {
+    title: "Manage utensils",
+    description:
+      "Save your baking dishes and other compatible utensils. Diameter and height must be inner usable measurements.",
+    errorTitle: "Manage utensils",
+    libraryLoadError: "The cookbook library could not be loaded.",
+    noCategories:
+      "No utensil categories are configured. Add utensilCategories to cookbook-library.json first.",
+    empty: "No utensils have been saved yet.",
+    addHeading: "Add utensil",
+    name: "Name",
+    namePlaceholder: "e.g. Medium pie dish",
+    category: "Category",
+    diameter: "Inner diameter (cm)",
+    width: "Inner width (cm)",
+    length: "Inner length (cm)",
+    height: "Usable inner height (cm)",
+    add: "Add utensil",
+    save: "Save",
+    delete: "Delete {{name}}",
+    nameRequired: "Please enter a utensil name.",
+    invalidDimensions:
+      "Diameter and usable inner height must be greater than zero.",
   },
   settings: {
     validation: {
@@ -504,6 +582,14 @@ export const en = {
         end: "After categories",
         hidden: "Hide",
       },
+      favoriteRecipes: {
+        name: "Favourite recipe display",
+        description:
+          "Choose whether favourites of selected guests are shown first, remain in the normal order, or are available through a separate movable browser button.",
+        top: "Show favourites first in every category",
+        normal: "Keep normal recipe order",
+        button: "Use a separate favourite-recipes button",
+      },
     },
     shopping: {
       heading: "Shopping list",
@@ -539,7 +625,9 @@ export const en = {
         "No categories found yet. Create or select a cookbook database first.",
       description:
         "Drag this row to change the browser order. Optionally select a square category image from the vault.",
-      imagePlaceholder: "Choose category image…",
+      favoriteDescription:
+        "Drag this row to place the favourite-recipes button in the browser. Optionally select a square image from the vault.",
+	  imagePlaceholder: "Choose category image…",
     },
     notices: {
       exampleDatabaseCreated: "Example cookbook database created.",
